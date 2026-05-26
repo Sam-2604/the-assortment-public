@@ -565,9 +565,13 @@ async function completePendingTake(session) {
   const raw = localStorage.getItem(PENDING_KEY);
   if (!raw) return;
 
+  // Remove immediately — before the async insert — so a second SIGNED_IN
+  // event firing in the same page load finds nothing and exits cleanly.
+  localStorage.removeItem(PENDING_KEY);
+
   let pending;
   try { pending = JSON.parse(raw); }
-  catch { localStorage.removeItem(PENDING_KEY); return; }
+  catch { return; }
 
   const { error } = await sb.from('takes').insert({
     user_id:      session.user.id,
@@ -575,8 +579,6 @@ async function completePendingTake(session) {
     take_text:    pending.take_text,
     display_name: pending.display_name || null
   });
-
-  localStorage.removeItem(PENDING_KEY);
 
   if (error) {
     console.error(error);
@@ -648,7 +650,7 @@ async function loadPreviousTakes() {
 
   const { data: { session } } = await sb.auth.getSession();
   if (!session) {
-    list.innerHTML = '<p class="take-prev-empty">your past takes appear here once you\u2019ve saved one</p>';
+    list.innerHTML = '<p class="take-prev-empty">your past takes appear here once you\u2019ve saved one \u2014 you log in the first time you save.</p>';
     return;
   }
 

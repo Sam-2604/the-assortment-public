@@ -320,19 +320,20 @@ a:hover {
 }
 
 /* Subtle corner close — the wheel's ✕ still works; this is just the
-   instinctive top-corner exit for first-time visitors. */
+   instinctive top-corner exit for first-time visitors. Kept small and
+   tucked into the screen corner so it never overlaps the iPod. */
 .overlay-close {
-  position: absolute;
-  top: 18px;
-  left: 18px;
-  width: 40px;
-  height: 40px;
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.3rem;
-  color: rgba(255, 255, 255, 0.55);
-  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.45);
+  background: transparent;
   border-radius: 50%;
   transition: color 0.2s, background 0.2s;
   z-index: 110;
@@ -340,7 +341,7 @@ a:hover {
 
 .overlay-close:hover {
   color: #fff;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .ipod {

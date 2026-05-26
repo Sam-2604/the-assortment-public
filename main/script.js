@@ -470,6 +470,7 @@ function bindControls() {
 
   document.getElementById('w-close').addEventListener('click', closeEntry);
   document.getElementById('w-credits').addEventListener('click', toggleCredits);
+  document.getElementById('overlay-close').addEventListener('click', closeEntry);
 
   // Click the dark backdrop (outside the iPod) to close — common expectation.
   document.getElementById('overlay').addEventListener('click', (e) => {
@@ -559,7 +560,7 @@ function bindControls() {
 
     if (error) {
       console.error(error);
-      showTakeStatus('couldn\u2019t send the link \u2014 try again.');
+      showTakeStatus('couldn\u2019t send the link \u2013 try again.');
     } else {
       showTakeStatus('check your inbox \uD83D\uDCEC click the link and your take saves itself.');
     }
@@ -674,7 +675,7 @@ async function completePendingTake(session) {
 
   if (error) {
     console.error(error);
-    showFloatingConfirm('you\u2019re signed in, but the take didn\u2019t save \u2014 open it again to retry.');
+    showFloatingConfirm('you\u2019re signed in, but the take didn\u2019t save \u2013 open it again to retry.');
   } else {
     showFloatingConfirm(`your take on ${pending.color || 'that moment'} was saved \uD83E\uDEC2`);
   }
@@ -705,7 +706,7 @@ async function saveTake(session, text) {
 
   if (error) {
     console.error(error);
-    showTakeStatus('something went wrong \u2014 try again.');
+    showTakeStatus('something went wrong \u2013 try again.');
   } else {
     document.getElementById('take-text').value = '';
     showTakeStatus('saved \uD83E\uDEC2 it\u2019s yours, kept private.');
@@ -759,7 +760,7 @@ async function loadPreviousTakes() {
     return;
   }
   if (!data || data.length === 0) {
-    list.innerHTML = '<p class="take-prev-empty">nothing here yet \u2014 this would be your first.</p>';
+    list.innerHTML = '<p class="take-prev-empty">nothing here yet \u2013 this would be your first.</p>';
     return;
   }
 

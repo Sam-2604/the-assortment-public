@@ -202,7 +202,7 @@ function loadEntry(id) {
 
     audioPlayer.addEventListener('ended', () => {
       isPlaying = false;
-      document.getElementById('w-play').textContent = '▶';
+      document.getElementById('w-play').textContent = '▶\uFE0E';
       clearInterval(progressTimer);
     });
 
@@ -278,7 +278,7 @@ function playAudio() {
 
   audioPlayer.play().catch(err => console.log("Autoplay blocked by browser"));
   isPlaying = true;
-  document.getElementById('w-play').textContent = '❚❚'; 
+  document.getElementById('w-play').textContent = '❚❚\uFE0E'; 
   startProgressTimer();
 }
 
@@ -290,7 +290,7 @@ function stopAudio() {
   }
   isPlaying = false;
   clearInterval(progressTimer);
-  document.getElementById('w-play').textContent = '▶';
+  document.getElementById('w-play').textContent = '▶\uFE0E';
   document.getElementById('progress-fill').style.width = '0%';
   document.getElementById('progress-time').textContent = '0:00';
 }
@@ -317,7 +317,7 @@ function startProgressTimer() {
     if (trimEnd !== null && audioPlayer.currentTime >= trimEnd) {
       audioPlayer.pause();
       isPlaying = false;
-      document.getElementById('w-play').textContent = '▶';
+      document.getElementById('w-play').textContent = '▶\uFE0E';
       clearInterval(progressTimer);
     }
   }, 250); 
@@ -389,9 +389,10 @@ function setupWheelVolume() {
   document.addEventListener('mousemove', onMove, { passive: false });
   document.addEventListener('mouseup', onEnd);
   
-  // Touch Listeners — start on the wheel (including its child buttons),
-  // and only treat as a volume drag once the finger actually moves on the
-  // ring, so taps on ▲ ▼ © ✕ still register as clicks.
+  // Touch Listeners — bound to the WHEEL itself (not document) so the browser
+  // routes the gesture here rather than treating it as a page scroll. The
+  // wheel also has `touch-action: none` in CSS, which is what actually lets
+  // preventDefault work and stops the page from scrolling under the finger.
   let touchStartX = 0, touchStartY = 0, touchMoved = false;
 
   wheel.addEventListener('touchstart', (e) => {
@@ -400,9 +401,9 @@ function setupWheelVolume() {
     touchStartY = t.clientY;
     touchMoved = false;
     onStart(e);
-  }, { passive: true });
+  }, { passive: false });
 
-  document.addEventListener('touchmove', (e) => {
+  wheel.addEventListener('touchmove', (e) => {
     if (!isDragging) return;
     const t = e.touches[0];
     // Only engage the volume drag after a real movement, so a stationary
@@ -416,7 +417,8 @@ function setupWheelVolume() {
     onMove(e);
   }, { passive: false });
 
-  document.addEventListener('touchend', onEnd);
+  wheel.addEventListener('touchend', onEnd);
+  wheel.addEventListener('touchcancel', onEnd);
 }
 
 // ── EVENT BINDINGS (Buttons, Keystrokes, Scrubbing) ────────
@@ -454,7 +456,7 @@ function bindControls() {
     if (isPlaying) {
       audioPlayer.pause();
       isPlaying = false;
-      document.getElementById('w-play').textContent = '▶';
+      document.getElementById('w-play').textContent = '▶\uFE0E';
     } else {
       playAudio();
     }
@@ -551,7 +553,7 @@ function bindControls() {
 
     if (error) {
       console.error(error);
-      showTakeStatus('couldn\u2019t send the link \u2014 try again.');
+      showTakeStatus('couldn\u2019t send the link \u2013 try again.');
     } else {
       showTakeStatus('check your inbox \uD83D\uDCEC click the link and your take saves itself.');
     }
@@ -602,7 +604,7 @@ function bindControls() {
         if (isPlaying) {
           audioPlayer.pause();
           isPlaying = false;
-          document.getElementById('w-play').textContent = '▶';
+          document.getElementById('w-play').textContent = '▶\uFE0E';
         } else {
           playAudio();
         }
@@ -666,7 +668,7 @@ async function completePendingTake(session) {
 
   if (error) {
     console.error(error);
-    showFloatingConfirm('you\u2019re signed in, but the take didn\u2019t save \u2014 open it again to retry.');
+    showFloatingConfirm('you\u2019re signed in, but the take didn\u2019t save \u2013 open it again to retry.');
   } else {
     showFloatingConfirm(`your take on ${pending.color || 'that moment'} was saved \uD83E\uDEC2`);
   }
@@ -697,7 +699,7 @@ async function saveTake(session, text) {
 
   if (error) {
     console.error(error);
-    showTakeStatus('something went wrong \u2014 try again.');
+    showTakeStatus('something went wrong \u2013 try again.');
   } else {
     document.getElementById('take-text').value = '';
     showTakeStatus('saved \uD83E\uDEC2 it\u2019s yours, kept private.');
@@ -751,7 +753,7 @@ async function loadPreviousTakes() {
     return;
   }
   if (!data || data.length === 0) {
-    list.innerHTML = '<p class="take-prev-empty">nothing here yet \u2014 this would be your first.</p>';
+    list.innerHTML = '<p class="take-prev-empty">nothing here yet \u2013 this would be your first.</p>';
     return;
   }
 
@@ -835,7 +837,7 @@ function formatCredit(val) {
   if (val.startsWith('http')) {
     const cleanUrl = escapeHTML(val);
     // Shows the raw URL text, but makes it clickable with the ↗
-    return `<a href="${cleanUrl}" target="_blank" rel="noopener">${cleanUrl} ↗</a>`;
+    return `<a href="${cleanUrl}" target="_blank" rel="noopener">${cleanUrl} ↗\uFE0E</a>`;
   }
   // If not a link, just show the text naturally (no arrow)
   return escapeHTML(val);

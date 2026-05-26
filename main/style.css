@@ -310,6 +310,7 @@ a:hover {
   align-items: center; 
   justify-content: center; 
   z-index: 100;
+  padding: 12px;
 }
 
 .ipod {
@@ -317,6 +318,7 @@ a:hover {
   border-radius: 34px;
   width: min(480px, 94vw);
   height: min(90vh, 850px);
+  height: min(90dvh, 850px); /* dvh excludes mobile browser chrome (URL bar, toolbar) */
   padding: 18px;
   display: flex;
   flex-direction: column;
@@ -533,11 +535,12 @@ a:hover {
   position: relative; 
   margin: 10px auto; 
   box-shadow: inset 0 2px 5px rgba(0,0,0,0.1), 0 5px 15px rgba(0,0,0,0.2);
+  touch-action: none;
 }
 
 .wnav { 
   position: absolute; 
-  font-size: 1.2rem; 
+  font-size: 1.1rem; 
   color: #6a6460; 
   transition: color 0.2s;
 }
@@ -557,7 +560,7 @@ a:hover {
   top: 50%; 
   left: 50%; 
   transform: translate(-50%, -50%); 
-  font-size: 1.2rem; 
+  font-size: 1.1rem; 
   box-shadow: 0 3px 10px rgba(0,0,0,0.2);
 }
 .wcenter:active { transform: translate(-50%, -50%) scale(0.95); }
@@ -823,18 +826,28 @@ textarea:focus {
     padding: 2rem 1.5rem;
   }
 
-  /* Controls bar: stack the sort buttons and count so the entry-count
-     no longer overlaps the Chronological/Recent/Shuffle toggles. */
+  /* Controls bar: keep sort buttons and count on ONE line, just sized down
+     so the count no longer collides or wraps to its own line. */
   .controls-bar {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.6rem;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
     padding: 0.85rem 1.25rem;
   }
 
   .sort-controls {
-    flex-wrap: wrap;
     gap: 0.5rem;
+  }
+
+  .sort-btn {
+    font-size: 0.78rem;
+  }
+
+  .entry-count {
+    font-size: 0.7rem;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   /* Header padding tightened for small screens */
@@ -857,12 +870,14 @@ textarea:focus {
     gap: 1rem;
   }
 
-  /* iPod: use more of the viewport, slightly smaller radius */
+  /* iPod: use dynamic viewport height so the URL bar / bottom toolbar
+     never cover it. dvh = the actually-visible height on mobile. */
   .ipod {
-    width: 96vw;
-    height: min(92vh, 800px);
-    padding: 14px;
-    border-radius: 28px;
+    width: 94vw;
+    height: 88vh;
+    height: 88dvh;
+    padding: 12px;
+    border-radius: 26px;
   }
 
   /* Take modal: fit small screens, allow internal scroll */

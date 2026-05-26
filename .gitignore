@@ -1,0 +1,41 @@
+# ─────────────────────────────────────────────
+# THE ASSORTMENT — .gitignore
+# Keeps private files and secrets OUT of GitHub.
+# ─────────────────────────────────────────────
+
+# Rough Notes and API keys
+Assortment plan.docx
+STUDY.md
+
+# Instructions for setting up web infra
+setup-files/
+
+# Local Secrets
+data.private.js
+
+# Secrets for the upload script (B2 keys).
+.env
+.env.*
+*.log
+.env.local
+
+# Local media — these live in B2, not in the repo.
+visuals/
+audio/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+*.swp
+
+# B2 SDK local auth cache, if any
+.b2_account_info

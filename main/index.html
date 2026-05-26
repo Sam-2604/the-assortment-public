@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Assortment</title>
+  
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <header class="site-header">
+    <h1 class="site-title">The Assortment</h1>
+    <p class="site-sub">a collection of moments</p>
+    <p class="site-byline">by Samarth Goradia</p>
+    
+    <div class="header-nav">
+      <button class="about-toggle" id="about-toggle">what is this? ↓</button>
+      <span class="sep">|</span>
+      <button class="about-toggle" id="origin-toggle">the origin ↓</button>
+      <span class="sep">|</span>
+      <button class="about-toggle" id="take-nav-toggle">your take ↓</button>
+    </div>
+  </header>
+
+  <section class="about-section" id="about-section">
+    <div class="about-inner">
+      <p class="about-text">
+        A personal archive of feelings expressed through image and sound.
+        <br>
+        Each entry is a moment / representation - not named and not explained. 
+        <br>
+        Just felt.
+        <br>
+        It's a digital shelf for the things that made me pause.
+        <br>
+        The things that made everything make sense.
+        <br>
+        🌏❤️🫂
+      </p>
+    </div>
+  </section>
+
+  <section class="about-section" id="origin-section">
+    <div class="about-inner">
+      <p class="about-text">
+        The Assortment existed previously on my Instagram's Close Friends stories.
+        <br>
+        The Assortment began as a way to express without language as a barrier. 
+        <br>
+        Language can diminish the raw feeling of an emotion. 
+        <br>
+        Some things are just felt and never said.
+        <br>
+        📷🎵🎨🌊🌍🌅🌌
+      </p>
+    </div>
+  </section>
+
+  <section class="about-section" id="take-nav-section">
+    <div class="about-inner">
+      <p class="about-text">
+        I expressed these moments and they hold their own meaning / interpretation for me. 
+        <br>
+        Art is open to interpretation. 
+        <br>
+        This moment could mean something entirely 
+        different to you, and if I tell you my interpretation, it ruins / steals yours.
+        <br>
+        Your take is for you to express what that moment means to you.
+        <br>
+        Safe Space 🫂❤️
+      </p>
+    </div>
+  </section>
+
+  <div class="controls-bar">
+    <div class="sort-controls">
+      <button class="sort-btn active" id="btn-chrono">Chronological</button>
+      <span class="sep">·</span>
+      <button class="sort-btn" id="btn-recent">Recent</button>
+      <span class="sep">·</span>
+      <button class="sort-btn" id="btn-shuffle">Shuffle</button>
+    </div>
+    <span class="entry-count" id="entry-count"></span>
+  </div>
+
+  <main class="playlist" id="playlist"></main>
+
+  <div class="load-more-wrap">
+    <button class="load-more-btn hidden" id="btn-load-more">Load More</button>
+  </div>
+
+  <footer class="site-footer">
+    <button class="about-toggle" id="disclaimer-toggle">legal & usage ↓</button>
+    
+    <div class="about-section" id="disclaimer-section">
+      <div class="about-inner">
+        <p class="disclaimer">
+          This is a non-commercial, personal archive. 
+          <br>
+          All media is used under transformative "Fair Use" guidelines: 
+          <br>
+          clips are restricted to 30 seconds or less and serve as an artistic commentary 
+          <br>
+          rather than a distribution of the original work. 
+          <br>
+          No copyright infringement is intended.
+          <br>
+          ☮️
+        </p>
+      </div>
+    </div>
+    
+    <div class="footer-links">
+      <p> reach out: <a href="mailto:samarthgoradia@gmail.com">samarthgoradia@gmail.com</a></p>
+      <span class="sep">|</span>
+      <a href="https://samarthgoradia.com" target="_blank">samarthgoradia.com 🔜</a>
+    </div>
+  </footer>
+
+  <div class="overlay hidden" id="overlay">
+    <div class="ipod" id="ipod">
+      
+      <div class="ipod-screen-shell">
+        <div class="ipod-screen">
+          
+          <div class="screen-view" id="view-main">
+            <div class="screen-bar">
+              <span class="screen-label">♫ The Assortment</span>
+              <span class="screen-pos" id="screen-pos"></span>
+            </div>
+            
+            <div class="screen-media" id="screen-media"></div>
+            <div id="volume-indicator" class="volume-indicator hidden">VOL 74%</div>
+            
+            <div class="screen-meta">
+              <span class="screen-id" id="screen-id"></span>
+              <span class="screen-audio" id="screen-audio"></span>
+              <span class="screen-date" id="screen-date"></span>
+            </div>
+            
+            <div class="screen-progress">
+              <div class="progress-track">
+                <div class="progress-fill" id="progress-fill"></div>
+              </div>
+              <span class="progress-time" id="progress-time">0:00</span>
+            </div>
+          </div>
+          
+          <div class="screen-view hidden" id="view-credits">
+            <div class="screen-bar">
+              <span class="screen-label">credits</span>
+              <span class="screen-pos">© to close</span>
+            </div>
+            <div class="credits-body">
+              <div class="credits-row">
+                <span class="credits-label">visual</span>
+                <span class="credits-val" id="cred-media"></span>
+              </div>
+              <div class="credits-row">
+                <span class="credits-label">audio</span>
+                <span class="credits-val" id="cred-audio"></span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="ipod-strip">the assortment · sg</div>
+      <div class="wheel-area">
+        <div class="wheel">
+          <button class="wnav top"   id="w-prev">▲</button>
+          <button class="wnav right" id="w-close">✕</button>
+          <button class="wnav bot"   id="w-next">▼</button>
+          <button class="wnav left"  id="w-credits">©</button>
+          <button class="wcenter"    id="w-play">▶</button>
+        </div>
+      </div>
+      
+      <div class="ipod-actions">
+        <button class="take-btn" id="btn-take">your take ↗</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="take-modal hidden" id="take-modal">
+    <div class="take-box">
+      <h3 id="take-heading">what does this mean to you?</h3>
+      <p class="take-id" id="take-id"></p>
+
+      <!-- STEP 1 — write -->
+      <div id="take-step-write">
+        <textarea id="take-text" placeholder="write anything. a feeling, a memory, a word..."></textarea>
+        <div class="take-actions">
+          <button id="take-save">save</button>
+          <button id="take-cancel" class="take-cancel">cancel</button>
+        </div>
+        <button class="take-prev-toggle" id="take-prev-toggle">see your previous takes ↓</button>
+        <div class="take-prev-list hidden" id="take-prev-list"></div>
+      </div>
+
+      <!-- STEP 2 — identify (only shown when not logged in & saving) -->
+      <div id="take-step-email" class="hidden">
+        <p class="take-email-intro">
+          one-time email to save your take. no password — a link lands in
+          your inbox, you click it, and the take saves itself.
+        </p>
+        <input type="email" id="take-email" placeholder="your email (required)">
+        <input type="text" id="take-name" placeholder="a name to sign with (optional)">
+        <div class="take-actions">
+          <button id="take-send-link">send link</button>
+          <button id="take-back" class="take-cancel">back</button>
+        </div>
+      </div>
+
+      <p class="take-status hidden" id="take-status"></p>
+      <p class="take-note" id="take-note">no password needed · only you can ever read your takes</p>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="data.public.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

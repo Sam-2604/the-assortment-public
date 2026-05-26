@@ -421,7 +421,7 @@ const ENTRIES = [
     audioLabel:       "THE GREATEST - Billie Eilish",
     audioSource:      "https://open.spotify.com/track/6TGd66r0nlPaYm3KIoI7ET?si=9d221913161c4732",
     mediaSource:      "https://pin.it/5QXdbpfTz",
-    placeholderColor: "#dedede"},
+    placeholderColor: "#cac7c7"},
   {
     id: 33,
     date:             "2026-05-15",

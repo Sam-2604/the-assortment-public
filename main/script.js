@@ -173,6 +173,7 @@ function loadEntry(id) {
   
   // Render Credits Panel (Checking for URLs)
   document.getElementById('cred-media').innerHTML = formatCredit(entry.mediaSource);
+  document.getElementById('cred-label').textContent = entry.audioLabel || '—';
   document.getElementById('cred-audio').innerHTML = formatCredit(entry.audioSource);
 
   // Load the visual media into the screen area
@@ -181,7 +182,7 @@ function loadEntry(id) {
   if (entry.mediaType === 'video' && entry.media) {
     mediaEl.innerHTML = `<video class="screen-media-fg" src="${entry.media}" autoplay muted loop playsinline></video>`;
   } else if (entry.mediaType === 'image' && entry.media) {
-    mediaEl.innerHTML = `<img class="screen-media-fg" src="${entry.media}" alt="media">`;
+    mediaEl.innerHTML = `<img class="screen-media-fg" src="${entry.media}" alt="media" decoding="async">`;
   } else {
     mediaEl.innerHTML = `<div style="background:${entry.placeholderColor}; width:100%; height:100%; position:relative; z-index:1;"></div>`;
   }
@@ -208,8 +209,9 @@ function loadEntry(id) {
     playAudio();
   }
 
-  // Quietly prefetch the NEXT entry's audio so sequential ▼ navigation is instant.
+  // Quietly prefetch the NEXT entry's media so sequential ▼ navigation is instant.
   prefetchNextAudio();
+  prefetchNextMedia();
 }
 
 // Warms the CDN/browser cache for the next entry's audio without playing it.
@@ -224,6 +226,25 @@ function prefetchNextAudio() {
   prefetchEl.preload = 'metadata';
   const s = nextEntry.audioStart || 0;
   prefetchEl.src = nextEntry.audio + (s > 0 ? `#t=${s}` : '');
+}
+
+// Warms the cache for the next entry's image (and the one after) so the
+// visual appears instantly on ▼, the same way audio now does.
+let prefetchImgs = [];
+function prefetchNextMedia() {
+  prefetchImgs = []; // drop references so old ones can be GC'd
+  [1, 2].forEach(offset => {
+    const nextId = displayOrder[currentIndex + offset];
+    if (nextId === undefined) return;
+    const nextEntry = ENTRIES.find(e => e.id === nextId);
+    if (!nextEntry) return;
+    // Only images prefetch cleanly via Image(); videos stream on demand.
+    const url = nextEntry.mediaType === 'image' ? nextEntry.media : nextEntry.thumbnail;
+    if (!url) return;
+    const img = new Image();
+    img.src = url;
+    prefetchImgs.push(img);
+  });
 }
 
 function closeEntry() {
@@ -336,7 +357,7 @@ function setupWheelVolume() {
     if (diff < -Math.PI) diff += 2 * Math.PI;
     
     if (Math.abs(diff) > 0.02) { // Tiny threshold prevents jitter
-      let vol = audioPlayer.volume + (diff * 0.15); // Adjust multiplier for sensitivity
+      let vol = audioPlayer.volume + (diff * 0.35); // sensitivity
       vol = Math.max(0, Math.min(1, vol)); // Clamp between 0 and 1
       audioPlayer.volume = vol;
       lastAngle = currentAngle;
@@ -368,9 +389,33 @@ function setupWheelVolume() {
   document.addEventListener('mousemove', onMove, { passive: false });
   document.addEventListener('mouseup', onEnd);
   
-  // Touch Listeners
-  wheel.addEventListener('touchstart', onStart, { passive: true });
-  document.addEventListener('touchmove', onMove, { passive: false });
+  // Touch Listeners — start on the wheel (including its child buttons),
+  // and only treat as a volume drag once the finger actually moves on the
+  // ring, so taps on ▲ ▼ © ✕ still register as clicks.
+  let touchStartX = 0, touchStartY = 0, touchMoved = false;
+
+  wheel.addEventListener('touchstart', (e) => {
+    const t = e.touches[0];
+    touchStartX = t.clientX;
+    touchStartY = t.clientY;
+    touchMoved = false;
+    onStart(e);
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+    if (!isDragging) return;
+    const t = e.touches[0];
+    // Only engage the volume drag after a real movement, so a stationary
+    // tap on a button isn't hijacked.
+    if (!touchMoved) {
+      const dx = Math.abs(t.clientX - touchStartX);
+      const dy = Math.abs(t.clientY - touchStartY);
+      if (dx < 6 && dy < 6) return;
+      touchMoved = true;
+    }
+    onMove(e);
+  }, { passive: false });
+
   document.addEventListener('touchend', onEnd);
 }
 
@@ -417,6 +462,11 @@ function bindControls() {
 
   document.getElementById('w-close').addEventListener('click', closeEntry);
   document.getElementById('w-credits').addEventListener('click', toggleCredits);
+
+  // Click the dark backdrop (outside the iPod) to close — common expectation.
+  document.getElementById('overlay').addEventListener('click', (e) => {
+    if (e.target.id === 'overlay') closeEntry();
+  });
 
   // Progress Bar Scrubbing 
   const progressTrack = document.querySelector('.progress-track');
@@ -516,6 +566,13 @@ function bindControls() {
   // Cancel — close the modal
   document.getElementById('take-cancel').addEventListener('click', () => {
     document.getElementById('take-modal').classList.add('hidden');
+  });
+
+  // Click the take-modal backdrop (outside the box) to close it.
+  document.getElementById('take-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'take-modal') {
+      document.getElementById('take-modal').classList.add('hidden');
+    }
   });
 
   // "see your previous takes" toggle
@@ -677,7 +734,7 @@ async function loadPreviousTakes() {
 
   const { data: { session } } = await sb.auth.getSession();
   if (!session) {
-    list.innerHTML = '<p class="take-prev-empty">your past takes appear here once you\u2019ve saved one \u2014 you log in the first time you save.</p>';
+    list.innerHTML = '<p class="take-prev-empty">your past takes appear hear once you\u2019ve saved one</p>';
     return;
   }
 

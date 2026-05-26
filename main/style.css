@@ -415,6 +415,7 @@ a:hover {
   display: flex; 
   gap: 0.75rem; 
   border-top: 1px solid rgba(255,255,255,0.05); 
+  align-items: center;
 }
 
 .screen-id { 
@@ -422,6 +423,7 @@ a:hover {
   font-size: 0.7rem; 
   color: #ffffff; 
   font-weight: 600; 
+  flex-shrink: 0;
 }
 
 .screen-audio { 
@@ -429,6 +431,7 @@ a:hover {
   font-size: 0.65rem; 
   color: #5888d8; 
   flex: 1; 
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -438,6 +441,7 @@ a:hover {
   font-family: var(--mono); 
   font-size: 0.6rem; 
   color: #2e4a72; 
+  flex-shrink: 0;
 }
 
 .screen-progress { 
@@ -475,7 +479,7 @@ a:hover {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 1.5rem;
+  gap: 1.25rem;
   padding: 2rem;
 }
 
@@ -522,8 +526,8 @@ a:hover {
 }
 
 .wheel { 
-  width: 140px; 
-  height: 140px; 
+  width: 154px; 
+  height: 154px; 
   border-radius: 50%; 
   background: #ccc6bd; 
   position: relative; 
@@ -533,27 +537,27 @@ a:hover {
 
 .wnav { 
   position: absolute; 
-  font-size: 1.1rem; 
+  font-size: 1.2rem; 
   color: #6a6460; 
   transition: color 0.2s;
 }
 
 .wnav:hover { color: #222; }
-.wnav.top   { top: 14px; left: 50%; transform: translateX(-50%); }
-.wnav.bot   { bottom: 14px; left: 50%; transform: translateX(-50%); }
-.wnav.left  { left: 22px; top: 50%; transform: translateY(-50%); }
-.wnav.right { right: 22px; top: 50%; transform: translateY(-50%); }
+.wnav.top   { top: 10px; left: 50%; transform: translateX(-50%); }
+.wnav.bot   { bottom: 10px; left: 50%; transform: translateX(-50%); }
+.wnav.left  { left: 18px; top: 50%; transform: translateY(-50%); }
+.wnav.right { right: 18px; top: 50%; transform: translateY(-50%); }
 
 .wcenter { 
-  width: 50px; 
-  height: 50px; 
+  width: 55px; 
+  height: 55px; 
   border-radius: 50%; 
   background: #fff; 
   position: absolute; 
   top: 50%; 
   left: 50%; 
   transform: translate(-50%, -50%); 
-  font-size: 1.1rem; 
+  font-size: 1.2rem; 
   box-shadow: 0 3px 10px rgba(0,0,0,0.2);
 }
 .wcenter:active { transform: translate(-50%, -50%) scale(0.95); }
@@ -799,9 +803,78 @@ textarea:focus {
 /* Utility class to hide elements */
 .hidden { display: none !important; }
 
-/* ── MOBILE SAFEGUARD ── */
+/* ── MOBILE OPTIMIZATION ── */
 @media (max-width: 600px) {
+
+  /* Dropdown sections: text wraps on mobile, so allow generous height
+     and let the inner padding breathe less. The disclaimer is the tallest. */
   .about-text, .disclaimer {
     white-space: normal;
+    font-size: 0.9rem;
+    line-height: 1.7;
+  }
+
+  .about-section.open {
+    max-height: 1000px;   /* wrapped text is much taller; don't clip it */
+  }
+
+  .about-inner {
+    max-width: 100%;
+    padding: 2rem 1.5rem;
+  }
+
+  /* Controls bar: stack the sort buttons and count so the entry-count
+     no longer overlaps the Chronological/Recent/Shuffle toggles. */
+  .controls-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.85rem 1.25rem;
+  }
+
+  .sort-controls {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  /* Header padding tightened for small screens */
+  .site-header {
+    padding: 2.5rem 1.25rem 2rem;
+  }
+
+  .header-nav {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* Playlist: single column with comfortable card padding */
+  .playlist {
+    grid-template-columns: 1fr;
+  }
+
+  .entry-card {
+    padding: 1rem 1.25rem;
+    gap: 1rem;
+  }
+
+  /* iPod: use more of the viewport, slightly smaller radius */
+  .ipod {
+    width: 96vw;
+    height: min(92vh, 800px);
+    padding: 14px;
+    border-radius: 28px;
+  }
+
+  /* Take modal: fit small screens, allow internal scroll */
+  .take-box {
+    width: 92vw;
+    max-height: 88vh;
+    overflow-y: auto;
+    padding: 1.5rem;
+  }
+
+  /* Footer breathing room */
+  .site-footer {
+    padding: 1.25rem 1.25rem 2rem;
   }
 }

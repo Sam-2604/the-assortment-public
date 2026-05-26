@@ -831,9 +831,9 @@ textarea:focus {
   .controls-bar {
     flex-direction: row;
     justify-content: space-between;
-    align-items: center;
+    align-items: baseline;
     gap: 0.5rem;
-    padding: 0.85rem 1.25rem;
+    padding: 0.85rem 1.5rem;
   }
 
   .sort-controls {

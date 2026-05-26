@@ -198,6 +198,7 @@ function loadEntry(id) {
 
     audioPlayer = new Audio();
     audioPlayer.preload = 'metadata';
+    audioPlayer.volume = 0.75; // leaves headroom so the wheel can go both up and down
     audioPlayer.src = entry.audio + frag;
 
     audioPlayer.addEventListener('ended', () => {
@@ -330,6 +331,7 @@ function setupWheelVolume() {
   let isDragging = false;
   let lastAngle = 0;
   let volTimeout = null;
+  let vol = 0.75; // tracked separately so we don't lose precision to clamping
 
   function getAngle(e) {
     const rect = wheel.getBoundingClientRect();
@@ -343,6 +345,8 @@ function setupWheelVolume() {
   function onStart(e) {
     isDragging = true;
     lastAngle = getAngle(e);
+    // sync our tracker to the player's current volume on grab
+    if (audioPlayer) vol = audioPlayer.volume;
   }
 
   function onMove(e) {
@@ -352,16 +356,18 @@ function setupWheelVolume() {
     const currentAngle = getAngle(e);
     let diff = currentAngle - lastAngle;
     
-    // Normalize angular wrapping (crossing the left-side axis)
+    // Normalize angular wrapping (crossing the ±π axis on the left of the wheel)
     if (diff > Math.PI) diff -= 2 * Math.PI;
     if (diff < -Math.PI) diff += 2 * Math.PI;
+
+    // Ignore the huge jump that happens right at the wrap boundary
+    if (Math.abs(diff) > 1.5) { lastAngle = currentAngle; return; }
     
-    if (Math.abs(diff) > 0.02) { // Tiny threshold prevents jitter
-      let vol = audioPlayer.volume + (diff * 0.35); // sensitivity
-      vol = Math.max(0, Math.min(1, vol)); // Clamp between 0 and 1
+    if (Math.abs(diff) > 0.03) { // threshold prevents jitter
+      // Clockwise (positive diff) = louder, anticlockwise = softer.
+      vol = Math.max(0, Math.min(1, vol + diff * 0.4));
       audioPlayer.volume = vol;
       lastAngle = currentAngle;
-      
       showVolumeIndicator(vol);
     }
   }
@@ -553,7 +559,7 @@ function bindControls() {
 
     if (error) {
       console.error(error);
-      showTakeStatus('couldn\u2019t send the link \u2013 try again.');
+      showTakeStatus('couldn\u2019t send the link \u2014 try again.');
     } else {
       showTakeStatus('check your inbox \uD83D\uDCEC click the link and your take saves itself.');
     }
@@ -668,7 +674,7 @@ async function completePendingTake(session) {
 
   if (error) {
     console.error(error);
-    showFloatingConfirm('you\u2019re signed in, but the take didn\u2019t save \u2013 open it again to retry.');
+    showFloatingConfirm('you\u2019re signed in, but the take didn\u2019t save \u2014 open it again to retry.');
   } else {
     showFloatingConfirm(`your take on ${pending.color || 'that moment'} was saved \uD83E\uDEC2`);
   }
@@ -699,7 +705,7 @@ async function saveTake(session, text) {
 
   if (error) {
     console.error(error);
-    showTakeStatus('something went wrong \u2013 try again.');
+    showTakeStatus('something went wrong \u2014 try again.');
   } else {
     document.getElementById('take-text').value = '';
     showTakeStatus('saved \uD83E\uDEC2 it\u2019s yours, kept private.');
@@ -736,7 +742,7 @@ async function loadPreviousTakes() {
 
   const { data: { session } } = await sb.auth.getSession();
   if (!session) {
-    list.innerHTML = '<p class="take-prev-empty">your past takes appear hear once you\u2019ve saved one</p>';
+    list.innerHTML = '<p class="take-prev-empty">your past takes appear here once you\u2019ve saved one.</p>';
     return;
   }
 
@@ -753,7 +759,7 @@ async function loadPreviousTakes() {
     return;
   }
   if (!data || data.length === 0) {
-    list.innerHTML = '<p class="take-prev-empty">nothing here yet \u2013 this would be your first.</p>';
+    list.innerHTML = '<p class="take-prev-empty">nothing here yet \u2014 this would be your first.</p>';
     return;
   }
 

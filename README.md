@@ -1,161 +1,88 @@
 # The Assortment
 
-A personal static site — plain HTML, CSS, and JS, no frameworks, no backend. A curated archive of audiovisual moments where each entry pairs an image or video with a short audio clip. Currently runs locally. Deployment target: a subdomain of `samarthgoradia.com` via Vercel.
+A personal archive of audiovisual moments - each entry pairs an image or short video with a brief audio excerpt, presented through an old-school interface. Moments are identified by hexcodes, not titles. They're meant to be felt, not explained.
+
+**Live:** [theassortment.samarthgoradia.com](https://theassortment.samarthgoradia.com)
+
+It began as a series of Instagram Close Friends stories; this is the standalone web version.
 
 ---
 
-## Table of Contents
+## Why it exists
 
-- [Project Structure](#project-structure)
-- [Running Locally](#running-locally)
-- [Adding an Entry](#adding-an-entry)
-- [The ID System](#the-id-system)
-- [Audio Trimming](#audio-trimming)
-- [iPod Controls](#ipod-controls)
-- [Private Meaning Field](#private-meaning-field)
-- [Your Take Feature](#your-take-feature)
-- [Known Bugs](#known-bugs)
-- [Roadmap](#roadmap)
-- [Deployment](#deployment)
+Some feelings resist language. The Assortment is an attempt to express them through the pairing of sound and image instead of words - a digital shelf for the things that made me pause. Visitors are invited to bring their own interpretation.
 
 ---
 
-## Project Structure
+## How it's built
+
+Plain HTML, CSS, and JavaScript - no framework, no build step. The interesting part isn't the stack, it's the architecture around keeping it free, fast, and private.
 
 ```
-assortment/
-├── index.html       Page structure and layout
-├── style.css        All visual design, iPod interface, responsive rules
-├── script.js        All logic: audio playback, iPod navigation, sorting, toggles
-├── data.js          Entry database — the only file edited regularly
-├── visual/          All local image and video files
-└── audio/           All local audio files
+Browser
+  │
+  ├── Site (HTML/CSS/JS)        → Vercel
+  ├── Media (images / audio)    → Backblaze B2, fronted by Cloudflare CDN
+  └── "Your Take" reflections   → Supabase (Postgres + magic-link auth)
+                                   email via Resend
 ```
 
-`data.js` is loaded as a plain `<script>` tag before `script.js`. It sets a global `const ENTRIES` array. No imports or module syntax — keep it that way.
+**The whole thing runs on free tiers.** Media delivery is free because Backblaze B2 and Cloudflare are part of the Bandwidth Alliance - B2 is the origin, Cloudflare caches at the edge, and the transfer between them costs nothing.
+
+### Public / private separation
+
+The design problem at the centre of the project: every entry has a private *meaning* I want to keep to myself, but the site and its data are public.
+
+The solution is a publish pipeline (`publish.py`). I maintain a private master data file locally with full paths and meanings. The script:
+
+1. uploads any new media to B2 (skipping what's already there),
+2. generates a public data file with local paths swapped for CDN URLs,
+3. strips every `meaning` field, and
+4. runs a leak-check confirming no meaning reached the public output.
+
+The private master never leaves my machine. Only the stripped, CDN-pointed public file is committed and deployed.
+
+### "Your Take"
+
+Visitors can leave their own interpretation of a moment. It's append-only and private to each person:
+
+- **Magic-link auth** (Supabase) - no passwords; your email is your identity.
+- **Row Level Security** - Postgres policies enforce that you can only ever read or write your *own* takes. The public API key exposed in the client is safe precisely because security lives in the database, not in hiding the key.
+- **Append model** - every save is a new permanent row; reflections accumulate rather than overwrite.
 
 ---
 
-## Running Locally
+## Features
 
-Do not open `index.html` by double-clicking it. Browsers block media APIs on `file://` URLs, which means audio will silently fail to load.
-
-**Correct method:** Open the project folder in VS Code and use the [Live Server](https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer) extension. Click **Go Live** in the bottom-right status bar. The site opens at `http://127.0.0.1:5500`.
+- Old-School click-wheel interface (prev / next / play-pause / credits / close)
+- Three sort modes - chronological, recent, shuffle
+- Pagination, lazy-loaded thumbnails, keyboard shortcuts
+- Per-entry credits panel linking to original sources
+- Audio excerpting via time-range fragments + next-entry prefetch for fast sequential playback
 
 ---
 
-## Adding an Entry
+## Project structure
 
-**Step 1 — Save your files**
-
-Drop them into the appropriate folders:
-- `visual/` → image (`sparks.jpg`) or video (`clip.mp4`)
-- `audio/` → audio file (`sparks.mp3`) — can be the full uncut file, see [Audio Trimming](#audio-trimming)
-
-**Step 2 — Add the entry to `data.js`**
-
-Copy the template at the bottom of `data.js` and append it to the `ENTRIES` array. Always add a comma after the previous entry's closing `}`.
-
-```js
-{
-  id:               7,                        // next number — permanent, never change or reuse
-  date:             "2025-05-10",             // YYYY-MM-DD
-
-  thumbnail:        null,                     // "visual/07-thumb.jpg" or null
-  media:            "../visual/07.jpg",       // "../visual/07.jpg" or "../visual/07.mp4" or null
-  mediaType:        "image",                  // "image" or "video"
-
-  audio:            "../audio/07.mp3",        // can be the full uncut file
-  audioStart:       0,                        // seconds to start from (0 = beginning)
-  audioEnd:         null,                     // seconds to stop at (null = play to end)
-
-  audioSource:      "Artist — Song Name",     // shown in the credits panel
-  mediaSource:      "https://source-url.com", // shown in the credits panel, or null
-
-  placeholderColor: "#1e2a3a",                // see ID System below — choose deliberately
-  meaning:          "PRIVATE: ..."            // never rendered anywhere
-}
+```
+main/
+├── index.html
+├── style.css
+├── script.js
+├── config.js          # Supabase URL + anon key (public-safe)
+├── data.public.js     # generated: CDN URLs, meanings stripped
+├── publish.py         # the media + data pipeline
+visuals/  audio/        # local media (lives in B2, not committed)
 ```
 
-**Step 3 — Save and refresh.** Done.
+`data.private.js` (the master) and `.env` (B2 keys) are intentionally not in this repo.
 
 ---
 
-## The ID System
+## A note on the media
 
-Entries have no names or titles. Each entry's identity is its `placeholderColor` hex code, displayed on the card and on the iPod screen.
-
-The hex is chosen manually to match the emotional tone of the visual — it is not auto-generated and is not arbitrary. Once set, treat it as permanent. Do not change it.
-
-In the rare case two entries share the same hex, the date and audio credit disambiguate them. The probability of a genuine collision across a large archive is negligible given the size of the hex space.
+This is a non-commercial work. Each entry uses a brief excerpt of existing media, recontextualised to express a feeling, with every source credited. All rights to the original media remain with their owners. If you own something featured here and would like it removed, email **samarthgoradia@gmail.com** and it'll be taken down promptly.
 
 ---
 
-## Audio Trimming
-
-If your audio file is a full song and you only want a specific window to play, use `audioStart` and `audioEnd` in `data.js`. Both values are in seconds.
-
-| Goal | Config |
-|---|---|
-| Play from the beginning to 0:30 | `audioStart: 0, audioEnd: 30` |
-| Play from 1:20 to 1:50 | `audioStart: 80, audioEnd: 110` |
-| Play from 2:00 to end of file | `audioStart: 120, audioEnd: null` |
-
-The progress bar reflects the trimmed duration, not the full file duration.
-
----
-
-## iPod Controls
-
-| Action | How |
-|---|---|
-| Play / Pause | Center wheel button |
-| Next entry | ▼ on the wheel |
-| Previous entry | ▲ on the wheel |
-| Toggle credits panel | © on the left of the wheel |
-| Close | ✕ on the right of the wheel, or click outside the iPod |
-| Your Take | "your take ↗" button below the wheel |
-
-> **Note:** Keyboard shortcuts (Space, arrow keys, Escape) are pending re-addition to `script.js`.
-
----
-
-## Private Meaning Field
-
-The `meaning` field in each `data.js` entry is never rendered anywhere — not in the HTML, not in any panel. It exists only in the file on your machine.
-
-Before any public deployment, either delete these fields from `data.js` or ensure the file itself is not pushed to a public GitHub repository. If using GitHub, add `data.js` to `.gitignore` and manually upload it to Vercel instead, or strip the `meaning` fields before committing.
-
----
-
-## Your Take Feature
-
-"Your Take" currently saves viewer responses to the browser's `localStorage` only. The data lives on that device and browser. It is not transmitted anywhere. Clearing browser cache or site data will permanently delete it.
-
-This is intentional for the local phase. A proper submission and storage system (with optional anonymity) is planned for the public launch — see [Roadmap](#roadmap).
-
----
-
-## Roadmap
-
-Planned work for the weeks ahead, in rough priority order:
-
-1. **Log entries** — populate `data.js` with the real archive from the Instagram Close Friends stories.
-2. **Mobile optimisation** — the iPod overlay and playlist grid need proper responsive handling for small screens.
-3. **Your Take — persistent storage** — replace `localStorage` with a real submission system. Viewer responses should persist across sessions and devices. Include an option for the viewer to attach an identity or remain anonymous.
-4. **Update disclaimer** — the current footer disclaimer is a placeholder. Revise with more precise language before going public.
-5. **Personal website first** — build `samarthgoradia.com`, then deploy this as a subdomain (e.g. `assortment.samarthgoradia.com`) via Vercel.
-6. **Your Assortment** - option for others to build their own assortment somehow.
-
----
-
-## Deployment
-
-When ready, use [Vercel](https://vercel.com) free tier. Two options:
-
-- **Drag and drop** — upload the project folder directly in the Vercel dashboard.
-- **GitHub connect** — push to a repo, connect it to Vercel, and it auto-deploys on every push.
-
-No build step required. This is a plain static site — Vercel serves it as-is.
-
-Before deploying, decide what to do with `data.js` given the `meaning` fields (see [Private Meaning Field](#private-meaning-field)).
+*Built by [Samarth Goradia](https://samarthgoradia.com).*

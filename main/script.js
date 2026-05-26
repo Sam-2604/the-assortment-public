@@ -77,9 +77,9 @@ function loadMoreEntries(count) {
 
     let thumbHTML;
     if (entry.thumbnail) {
-      thumbHTML = `<img src="${entry.thumbnail}" alt="thumbnail">`;
+      thumbHTML = `<img src="${entry.thumbnail}" alt="thumbnail" loading="lazy">`;
     } else if (entry.media && entry.mediaType === 'image') {
-      thumbHTML = `<img src="${entry.media}" alt="thumbnail">`;
+      thumbHTML = `<img src="${entry.media}" alt="thumbnail" loading="lazy">`;
     } else {
       thumbHTML = `<div style="background:${entry.placeholderColor}; width:100%; height:100%;"></div>`;
     }
@@ -187,8 +187,18 @@ function loadEntry(id) {
   }
 
   if (entry.audio) {
-    audioPlayer = new Audio(entry.audio);
-    
+    // Fetch only the clip's time range when trim points exist, so the browser
+    // requests a byte range from the CDN instead of buffering the whole file.
+    const start   = entry.audioStart || 0;
+    const trimEnd = entry.audioEnd || null;
+    const frag    = trimEnd !== null ? `#t=${start},${trimEnd}`
+                  : start > 0        ? `#t=${start}`
+                  : '';
+
+    audioPlayer = new Audio();
+    audioPlayer.preload = 'metadata';
+    audioPlayer.src = entry.audio + frag;
+
     audioPlayer.addEventListener('ended', () => {
       isPlaying = false;
       document.getElementById('w-play').textContent = '▶';
@@ -197,6 +207,23 @@ function loadEntry(id) {
 
     playAudio();
   }
+
+  // Quietly prefetch the NEXT entry's audio so sequential ▼ navigation is instant.
+  prefetchNextAudio();
+}
+
+// Warms the CDN/browser cache for the next entry's audio without playing it.
+let prefetchEl = null;
+function prefetchNextAudio() {
+  const nextId = displayOrder[currentIndex + 1];
+  if (nextId === undefined) return;
+  const nextEntry = ENTRIES.find(e => e.id === nextId);
+  if (!nextEntry || !nextEntry.audio) return;
+
+  prefetchEl = new Audio();
+  prefetchEl.preload = 'metadata';
+  const s = nextEntry.audioStart || 0;
+  prefetchEl.src = nextEntry.audio + (s > 0 ? `#t=${s}` : '');
 }
 
 function closeEntry() {

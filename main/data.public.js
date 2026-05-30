@@ -447,7 +447,33 @@ const ENTRIES = [
     audioLabel:       "INTRO (HIT ME HARD AND SOFT TOUR) - Billie Eilish",
     audioSource:      "https://open.spotify.com/track/43ZbuNZJFbgGsYR5zq5ZKd?si=be6f25d47de841db",
     mediaSource:      "https://pin.it/6j0uqKNy6",
-    placeholderColor: "#dedede"}
+    placeholderColor: "#dedede"},
+  {
+    id: 35,
+    date:             "2023-09-09",
+    thumbnail:        null,
+    media:            "https://media.samarthgoradia.com/visuals/candy-morning.jpg",
+    mediaType:        "image",
+    audio:            "https://media.samarthgoradia.com/audio/Candy%20-%20LifafaHashback%20Hashish.mp3",
+    audioStart:       0,
+    audioEnd:         134,
+    audioLabel:       "Candy - Lifafa, Hashback Hashish",
+    audioSource:      "https://open.spotify.com/track/3eNVm12Ns8BOk4NqgWcGI4?si=2e036de00ba54391",
+    mediaSource:      "https://pin.it/2zfGtWOaj",
+    placeholderColor: "#6d3d14e8"},
+  {
+    id: 36,
+    date:             "2023-09-14",
+    thumbnail:        null,
+    media:            "https://media.samarthgoradia.com/visuals/Solitude.jpg",
+    mediaType:        "image",
+    audio:            "https://media.samarthgoradia.com/audio/Delicate%20-%20Damien%20Rice.mp3",
+    audioStart:       64,
+    audioEnd:         124,
+    audioLabel:       "Delicate - Damien Rice",
+    audioSource:      "https://open.spotify.com/track/6MY1xABxoZATrEr4FeUhEM?si=1e70b170cae74efb",
+    mediaSource:      "https://pin.it/D2szWy7a4",
+    placeholderColor: "#03020277"}
 ];
 
 

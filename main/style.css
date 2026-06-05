@@ -1,5 +1,5 @@
 /* ============================================================
-   THE ASSORTMENT — Stylesheet
+   THE ASSORTMENT - Stylesheet
    Palette: Near-Black + Ocean Blue
    ============================================================ */
 
@@ -319,7 +319,7 @@ a:hover {
   padding: 12px;
 }
 
-/* Subtle corner close — the wheel's ✕ still works; this is just the
+/* Subtle corner close - the wheel's ✕ still works; this is just the
    instinctive top-corner exit for first-time visitors. Kept small and
    tucked into the screen corner so it never overlaps the iPod. */
 .overlay-close {
@@ -697,7 +697,7 @@ textarea:focus {
   border-top: 1px solid var(--border);
 }
 
-/* ── YOUR TAKE — email step inputs ── */
+/* ── YOUR TAKE - email step inputs ── */
 .take-email-intro {
   font-size: 0.8rem;
   font-weight: 300;
@@ -727,7 +727,7 @@ textarea:focus {
 
 .take-box input::placeholder { color: var(--text-muted); }
 
-/* ── YOUR TAKE — previous takes ── */
+/* ── YOUR TAKE - previous takes ── */
 .take-prev-toggle {
   display: block;
   margin-top: 1rem;
@@ -801,7 +801,7 @@ textarea:focus {
   color: var(--text-muted);
 }
 
-/* ── YOUR TAKE — status line ── */
+/* ── YOUR TAKE - status line ── */
 .take-status {
   font-size: 0.8rem;
   font-weight: 400;
@@ -810,7 +810,7 @@ textarea:focus {
   line-height: 1.4;
 }
 
-/* ── YOUR TAKE — floating confirmation toast ── */
+/* ── YOUR TAKE - floating confirmation toast ── */
 .take-toast {
   position: fixed;
   left: 50%;

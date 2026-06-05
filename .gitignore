@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────
-# THE ASSORTMENT — .gitignore
+# THE ASSORTMENT - .gitignore
 # Keeps private files and secrets OUT of GitHub.
 # ─────────────────────────────────────────────
 
@@ -20,7 +20,7 @@ data.private.js
 *.log
 .env.local
 
-# Local media — these live in B2, not in the repo.
+# Local media - these live in B2, not in the repo.
 visuals/
 audio/
 

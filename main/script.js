@@ -1,5 +1,5 @@
 /* ============================================================
-   THE ASSORTMENT — Main Script
+   THE ASSORTMENT - Main Script
    Handles the playlist grid, iPod logic, audio playback,
    and dynamic UI toggles.
    ============================================================ */
@@ -93,7 +93,7 @@ function loadMoreEntries(count) {
       <div class="entry-thumb">${thumbHTML}</div>
       <div class="entry-info">
         <div class="entry-id">${entry.placeholderColor}</div>
-        <div class="entry-audio">${escapeHTML(entry.audioLabel || '—')}</div>
+        <div class="entry-audio">${escapeHTML(entry.audioLabel || '-')}</div>
         <div class="entry-date">${formatDate(entry.date)}</div>
       </div>
     `;
@@ -167,13 +167,13 @@ function loadEntry(id) {
 
   // Populate UI text fields using Hex Code as the primary identifier
   document.getElementById('screen-id').textContent    = entry.placeholderColor;
-  document.getElementById('screen-audio').textContent = entry.audioLabel || '—';
+  document.getElementById('screen-audio').textContent = entry.audioLabel || '-';
   document.getElementById('screen-date').textContent  = formatDate(entry.date);
   document.getElementById('screen-pos').textContent   = `${currentIndex + 1} / ${displayOrder.length}`;
   
   // Render Credits Panel (Checking for URLs)
   document.getElementById('cred-media').innerHTML = formatCredit(entry.mediaSource);
-  document.getElementById('cred-label').textContent = entry.audioLabel || '—';
+  document.getElementById('cred-label').textContent = entry.audioLabel || '-';
   document.getElementById('cred-audio').innerHTML = formatCredit(entry.audioSource);
 
   // Load the visual media into the screen area
@@ -395,7 +395,7 @@ function setupWheelVolume() {
   document.addEventListener('mousemove', onMove, { passive: false });
   document.addEventListener('mouseup', onEnd);
   
-  // Touch Listeners — bound to the WHEEL itself (not document) so the browser
+  // Touch Listeners - bound to the WHEEL itself (not document) so the browser
   // routes the gesture here rather than treating it as a page scroll. The
   // wheel also has `touch-action: none` in CSS, which is what actually lets
   // preventDefault work and stops the page from scrolling under the finger.
@@ -472,7 +472,7 @@ function bindControls() {
   document.getElementById('w-credits').addEventListener('click', toggleCredits);
   document.getElementById('overlay-close').addEventListener('click', closeEntry);
 
-  // Click the dark backdrop (outside the iPod) to close — common expectation.
+  // Click the dark backdrop (outside the iPod) to close - common expectation.
   document.getElementById('overlay').addEventListener('click', (e) => {
     if (e.target.id === 'overlay') closeEntry();
   });
@@ -512,14 +512,14 @@ function bindControls() {
     document.addEventListener('mouseup', onMouseUp);
   });
 
-  // "Your Take" — open the modal (no login needed just to write)
+  // "Your Take" - open the modal (no login needed just to write)
   document.getElementById('btn-take').addEventListener('click', () => {
     const entry = ENTRIES.find(e => e.id === displayOrder[currentIndex]);
     if (!entry) return;
     openTakeModal(entry);
   });
 
-  // Save — logged in: write straight to Supabase. Logged out: ask for email.
+  // Save - logged in: write straight to Supabase. Logged out: ask for email.
   document.getElementById('take-save').addEventListener('click', async () => {
     const text = document.getElementById('take-text').value.trim();
     if (!text) { showTakeStatus('write something first.'); return; }
@@ -572,7 +572,7 @@ function bindControls() {
     hideTakeStatus();
   });
 
-  // Cancel — close the modal
+  // Cancel - close the modal
   document.getElementById('take-cancel').addEventListener('click', () => {
     document.getElementById('take-modal').classList.add('hidden');
   });
@@ -631,14 +631,14 @@ function bindControls() {
 function initSupabase() {
   // Library present?
   if (typeof window.supabase === 'undefined') {
-    console.warn('Supabase library not loaded — Your Take disabled.');
+    console.warn('Supabase library not loaded - Your Take disabled.');
     return;
   }
   // Config filled in?
   if (typeof SUPABASE_URL === 'undefined' ||
       SUPABASE_URL.includes('YOUR_') ||
       SUPABASE_ANON_KEY.includes('YOUR_')) {
-    console.warn('Supabase config.js not filled in — Your Take disabled.');
+    console.warn('Supabase config.js not filled in - Your Take disabled.');
     return;
   }
 
@@ -658,7 +658,7 @@ async function completePendingTake(session) {
   const raw = localStorage.getItem(PENDING_KEY);
   if (!raw) return;
 
-  // Remove immediately — before the async insert — so a second SIGNED_IN
+  // Remove immediately - before the async insert - so a second SIGNED_IN
   // event firing in the same page load finds nothing and exits cleanly.
   localStorage.removeItem(PENDING_KEY);
 
@@ -824,7 +824,7 @@ function showFloatingConfirm(msg) {
 // ── UTILITIES ──────────────────────────────────────────────
 
 function formatDate(str) {
-  if (!str) return '—';
+  if (!str) return '-';
   const [y, m, d] = str.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('en-IN', {
     day: 'numeric', month: 'short', year: 'numeric'

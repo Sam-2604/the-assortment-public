@@ -845,7 +845,7 @@ const ENTRIES = [
     media:            "https://media.samarthgoradia.com/visuals/utopia.jpg",
     mediaType:        "image",
     audio:            "https://media.samarthgoradia.com/audio/SIRENS%20-%20Travis%20Scott.mp3",
-    audioStart:       184,
+    audioStart:       185,
     audioEnd:         204,
     audioLabel:       "SIRENS - Travis Scott",
     audioSource:      "https://open.spotify.com/track/7LSpFCvRZZot2AlmkUzy9k?si=4527828c6d1943c3",

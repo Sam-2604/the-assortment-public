@@ -915,7 +915,46 @@ const ENTRIES = [
     audioLabel:       "Porch - Alan Silvestri",
     audioSource:      "https://open.spotify.com/track/4tU1GfEahdy2NKGviJJuM4?si=c541d7a19cb440f5",
     mediaSource:      "https://pin.it/4TFK5ay4q",
-    placeholderColor: "#af4bd382"}
+    placeholderColor: "#af4bd382"},
+  {
+    id: 71,
+    date:             "2026-06-15",
+    thumbnail:        null,
+    media:            "https://media.samarthgoradia.com/visuals/bridge-amazing-spiderman-2.jpg",
+    mediaType:        "image",
+    audio:            "https://media.samarthgoradia.com/audio/clips/We%27re%20Best%20Friends%20-%20Hans%20ZimmerThe%20Magnificent%20SixPharrell%20WilliamsJohnny%20Marr__0_132.mp3",
+    audioStart:       0,
+    audioEnd:         132,
+    audioLabel:       "We're Best Friends - Hans Zimmer, The Magnificent Six, Pharrell Williams, Johnny Marr",
+    audioSource:      "https://open.spotify.com/track/3zyPGxIpvS7DNDTuSTRKIv?si=aba088ec60d343e3",
+    mediaSource:      "https://pin.it/66lfJqo1E",
+    placeholderColor: "#f09c488f"},
+  {
+    id: 72,
+    date:             "2026-06-15",
+    thumbnail:        null,
+    media:            "https://media.samarthgoradia.com/visuals/web/tum-ko.mp4",
+    mediaType:        "video",
+    audio:            "https://media.samarthgoradia.com/audio/clips/Tum%20Ho%20Rockstar%20Full%20Song%2C%20Ranbir%20Kapoor%2C%20Nargis%20Fakhri__201_268.mp3",
+    audioStart:       0,
+    audioEnd:         67,
+    audioLabel:       "Tum Ho - Mohit Chauhan, A.R. Rahman, Irshad Kamil",
+    audioSource:      "https://youtu.be/VqFn3FvVjk4?si=lwkmkJbp5gDvvTge",
+    mediaSource:      "https://youtu.be/VqFn3FvVjk4?si=lwkmkJbp5gDvvTge",
+    placeholderColor: "#bf2709b9"},
+  {
+    id: 73,
+    date:             "2026-06-15",
+    thumbnail:        null,
+    media:            "https://media.samarthgoradia.com/visuals/obsession.HEIC",
+    mediaType:        "image",
+    audio:            "https://media.samarthgoradia.com/audio/clips/One%20Wish%20Willow%20-%20Rock%20Burwell__12_60.mp3",
+    audioStart:       0,
+    audioEnd:         48,
+    audioLabel:       "One Wish Willow - Rock Burwell",
+    audioSource:      "https://open.spotify.com/track/3frzfKDFs0wrJre8eW6cIY?si=2b02f57c93c14063",
+    mediaSource:      "My Photos",
+    placeholderColor: "#ee2a03b5"}
 ];
 
 

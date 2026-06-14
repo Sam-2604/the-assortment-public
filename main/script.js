@@ -15,6 +15,7 @@ let sortMode         = 'chrono'; // 'chrono', 'recent', 'shuffle'
 let showCredits      = false;// Tracks which view the iPod screen is showing
 let sb               = null; // Supabase client (set in initSupabase)
 let activeTakeEntry  = null; // The entry the open "your take" modal refers to
+let videoEl          = null; // Active <video> for a video entry, slaved to the audio clock
 
 const PENDING_KEY = 'assortment_pending_take'; // survives the magic-link redirect
 
@@ -180,9 +181,11 @@ function loadEntry(id) {
   const mediaEl = document.getElementById('screen-media');
   
   if (entry.mediaType === 'video' && entry.media) {
-    // Play once and hold on the last frame (no loop). preload=auto + the
-    // faststart remux done at publish time means it streams from the first byte.
-    mediaEl.innerHTML = `<video class="screen-media-fg" src="${entry.media}" autoplay muted playsinline preload="auto"></video>`;
+    // No autoplay/loop: the video is slaved to the audio clip (same length) so a
+    // video entry feels like one piece - they start, pause, scrub and end together.
+    // Muted so only the audio clip is heard; preload=auto + faststart = instant.
+    mediaEl.innerHTML = `<video class="screen-media-fg" src="${entry.media}" muted playsinline preload="auto"></video>`;
+    videoEl = mediaEl.querySelector('video');
   } else if (entry.mediaType === 'image' && entry.media) {
     mediaEl.innerHTML = `<img class="screen-media-fg" src="${entry.media}" alt="media" decoding="async">`;
   } else {
@@ -190,13 +193,14 @@ function loadEntry(id) {
   }
 
   if (entry.audio) {
-    // Fetch only the clip's time range when trim points exist, so the browser
-    // requests a byte range from the CDN instead of buffering the whole file.
+    // The audio is a clip pre-trimmed to the exact segment, so we play the whole
+    // file to its natural end. We deliberately do NOT add a `#t=...,end` cap:
+    // the re-encoded clip carries a small encoder-delay offset, and the browser
+    // measured the fragment's end against that shifted timeline and clipped the
+    // last ~second. A start offset is only kept for any legacy full-length source.
     const start   = entry.audioStart || 0;
     const trimEnd = entry.audioEnd || null;
-    const frag    = trimEnd !== null ? `#t=${start},${trimEnd}`
-                  : start > 0        ? `#t=${start}`
-                  : '';
+    const frag    = start > 0 ? `#t=${start}` : '';
 
     audioPlayer = new Audio();
     // Clips are pre-trimmed to ~a few hundred KB at publish time, so we can
@@ -209,6 +213,7 @@ function loadEntry(id) {
       isPlaying = false;
       document.getElementById('w-play').textContent = '▶\uFE0E';
       clearInterval(progressTimer);
+      if (videoEl) videoEl.pause();
     });
 
     playAudio();
@@ -283,6 +288,13 @@ function playAudio() {
   }
 
   audioPlayer.play().catch(err => console.log("Autoplay blocked by browser"));
+
+  // Start the video in lockstep with the audio clock.
+  if (videoEl) {
+    videoEl.currentTime = Math.max(0, audioPlayer.currentTime - start);
+    videoEl.play().catch(() => {});
+  }
+
   isPlaying = true;
   document.getElementById('w-play').textContent = '❚❚\uFE0E'; 
   startProgressTimer();
@@ -293,6 +305,10 @@ function stopAudio() {
     audioPlayer.pause();
     audioPlayer.src = ''; 
     audioPlayer = null;
+  }
+  if (videoEl) {
+    videoEl.pause();
+    videoEl = null;
   }
   isPlaying = false;
   clearInterval(progressTimer);
@@ -313,7 +329,13 @@ function startProgressTimer() {
     
     const totalDuration = trimEnd !== null ? (trimEnd - start) : audioPlayer.duration;
     const elapsed = Math.max(0, audioPlayer.currentTime - start);
-    
+
+    // Keep the muted video locked to the audio clock; only correct on real
+    // drift so we don't stutter the video by reseeking it every tick.
+    if (videoEl && Math.abs(videoEl.currentTime - elapsed) > 0.3) {
+      videoEl.currentTime = elapsed;
+    }
+
     let pct = (elapsed / totalDuration) * 100;
     if (pct > 100) pct = 100;
 
@@ -322,6 +344,7 @@ function startProgressTimer() {
 
     if (trimEnd !== null && audioPlayer.currentTime >= trimEnd) {
       audioPlayer.pause();
+      if (videoEl) videoEl.pause();
       isPlaying = false;
       document.getElementById('w-play').textContent = '▶\uFE0E';
       clearInterval(progressTimer);
@@ -466,6 +489,7 @@ function bindControls() {
   document.getElementById('w-play').addEventListener('click', () => {
     if (isPlaying) {
       audioPlayer.pause();
+      if (videoEl) videoEl.pause();
       isPlaying = false;
       document.getElementById('w-play').textContent = '▶\uFE0E';
     } else {
@@ -499,6 +523,11 @@ function bindControls() {
       const totalDuration = end - start;
 
       audioPlayer.currentTime = start + (pct * totalDuration);
+
+      // Scrub the video to the same point so the frame tracks the bar.
+      if (videoEl) {
+        videoEl.currentTime = Math.min(videoEl.duration || Infinity, pct * totalDuration);
+      }
 
       document.getElementById('progress-fill').style.width = `${pct * 100}%`;
       document.getElementById('progress-time').textContent = formatTime(pct * totalDuration);

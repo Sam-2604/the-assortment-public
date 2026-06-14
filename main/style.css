@@ -354,16 +354,32 @@ a:hover {
   display: flex;
   flex-direction: column;
   box-shadow: 0 50px 100px rgba(0,0,0,0.5);
+  /* The device is a fixed-size frame. No amount of inner text (long audio
+     labels, credits, etc.) may ever resize it or push the wheel / "your take"
+     button outside the body — the screen absorbs the slack, text truncates. */
+  overflow: hidden;
 }
 
 .ipod-screen-shell {
-  flex: 1; 
-  background: #141414; 
-  border-radius: 12px; 
+  flex: 1;
+  background: #141414;
+  border-radius: 12px;
   padding: 4px;
-  display: flex; 
-  flex-direction: column; 
+  display: flex;
+  flex-direction: column;
   margin-bottom: 12px;
+  /* Let the screen shrink to share space rather than forcing the panel taller.
+     Without this, a flex item's auto min-height keeps it at content size and
+     overflow spills onto the wheel / take button. */
+  min-height: 0;
+}
+
+/* The strip, wheel and the "your take" action row are fixed furniture — they
+   keep their size and never get squeezed or shoved out by screen content. */
+.ipod-strip,
+.wheel-area,
+.ipod-actions {
+  flex-shrink: 0;
 }
 
 .ipod-screen { 
@@ -514,6 +530,10 @@ a:hover {
   justify-content: center;
   gap: 1.25rem;
   padding: 2rem;
+  /* Long source URLs/labels stay inside the screen: they scroll here rather
+     than stretching the panel. min-height:0 lets the flex child actually clip. */
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .credits-row { 

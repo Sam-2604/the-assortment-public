@@ -180,7 +180,9 @@ function loadEntry(id) {
   const mediaEl = document.getElementById('screen-media');
   
   if (entry.mediaType === 'video' && entry.media) {
-    mediaEl.innerHTML = `<video class="screen-media-fg" src="${entry.media}" autoplay muted loop playsinline></video>`;
+    // Play once and hold on the last frame (no loop). preload=auto + the
+    // faststart remux done at publish time means it streams from the first byte.
+    mediaEl.innerHTML = `<video class="screen-media-fg" src="${entry.media}" autoplay muted playsinline preload="auto"></video>`;
   } else if (entry.mediaType === 'image' && entry.media) {
     mediaEl.innerHTML = `<img class="screen-media-fg" src="${entry.media}" alt="media" decoding="async">`;
   } else {
@@ -197,7 +199,9 @@ function loadEntry(id) {
                   : '';
 
     audioPlayer = new Audio();
-    audioPlayer.preload = 'metadata';
+    // Clips are pre-trimmed to ~a few hundred KB at publish time, so we can
+    // fully buffer immediately for instant playback instead of just metadata.
+    audioPlayer.preload = 'auto';
     audioPlayer.volume = 0.75; // leaves headroom so the wheel can go both up and down
     audioPlayer.src = entry.audio + frag;
 
@@ -224,7 +228,8 @@ function prefetchNextAudio() {
   if (!nextEntry || !nextEntry.audio) return;
 
   prefetchEl = new Audio();
-  prefetchEl.preload = 'metadata';
+  // Small trimmed clips: warm the whole next clip so ▼ is instant.
+  prefetchEl.preload = 'auto';
   const s = nextEntry.audioStart || 0;
   prefetchEl.src = nextEntry.audio + (s > 0 ? `#t=${s}` : '');
 }

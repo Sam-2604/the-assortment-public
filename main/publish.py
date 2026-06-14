@@ -8,12 +8,24 @@ for the web.
 
 WHAT IT DOES, IN ORDER:
   1. Reads data.private.js (your master - local paths + meanings)
-  2. Finds every media file referenced (visuals + audio)
-  3. Uploads any file NOT already in your B2 bucket (skips duplicates)
+  2. For every entry:
+        - AUDIO: cuts the [audioStart, audioEnd] slice into a small,
+          loudness-normalised clip (EBU R128, two-pass, -14 LUFS, 128 kbps)
+          so the browser downloads ~200KB and plays instantly - instead of
+          shipping a whole 7-18MB song and seeking into it.
+        - VIDEO: remuxes with +faststart (lossless, no re-encode) so the
+          moov atom is at the front and it streams from the first byte.
+        - IMAGE: uploaded as-is.
+  3. Uploads any processed/needed file NOT already in your B2 bucket.
   4. Builds data.public.js where:
-        - every local media path is replaced with its public CDN URL
+        - audio  -> the small clip URL, audioStart -> 0, audioEnd -> clip length
+        - video  -> the faststart clip URL
+        - image  -> its public CDN URL
         - every `meaning` field is removed entirely
-  5. Leaves data.private.js completely untouched
+  5. Leaves data.private.js completely untouched.
+
+  Processed files are cached locally (audio/clips/, visuals/web/) and in the
+  bucket, so re-runs only touch new or re-trimmed entries.
 
 WHAT YOU DO AFTER:
   - git add / commit / push   (deploys data.public.js + site to Vercel)
@@ -25,25 +37,31 @@ ONE-TIME SETUP (do this once, before first run):
   1. Install the libraries:
         pip install b2sdk python-dotenv --break-system-packages
 
-  2. Create a file called  .env  in the project root with:
+  2. Install ffmpeg (provides ffmpeg + ffprobe):
+        brew install ffmpeg          # macOS
+
+  3. Create a file called  .env  in the project root with:
 
         B2_KEY_ID=your_application_key_id
         B2_APP_KEY=your_application_key
         B2_BUCKET=theassortment-media
         CDN_BASE=https://media.samarthgoradia.com
 
-     (You'll get these values from the Day 1 guide - B2 dashboard
-      gives you the first three, Cloudflare setup gives you CDN_BASE.)
-
-  3. Make sure .env and data.private.js are in .gitignore (the guide
-     provides the .gitignore file).
+  4. Make sure .env and data.private.js are in .gitignore.
 
 ------------------------------------------------------------------------
-RUN IT:
+RUN IT (from the main/ folder, where data.private.js lives):
         python publish.py
 
-        # Preview what WOULD happen without uploading or writing:
+        # Preview what WOULD happen without processing, uploading or writing:
         python publish.py --dry-run
+
+        # Also delete bucket files the site no longer references (old full
+        # songs, superseded clips, the non-faststart video) so B2 stays clean:
+        python publish.py --prune-orphans
+
+        # See exactly what prune WOULD delete first, deleting nothing:
+        python publish.py --prune-orphans --dry-run
 ========================================================================
 """
 
@@ -51,7 +69,8 @@ import os
 import re
 import sys
 import json
-import hashlib
+import shutil
+import subprocess
 from pathlib import Path
 
 # ── Third-party libs (installed in one-time setup) ─────────────────────
@@ -74,16 +93,24 @@ B2_APP_KEY = os.getenv("B2_APP_KEY")
 B2_BUCKET  = os.getenv("B2_BUCKET")
 CDN_BASE   = os.getenv("CDN_BASE", "").rstrip("/")
 
-# Local folders that hold your media (relative to this script).
-# Your data.js uses "../visuals/..." and "../audio/..." - but this script
-# sits in the project root alongside those folders, so we look for them
-# both with and without the "../" prefix.
+# Local folders that hold your media (relative to this script's run dir).
 LOCAL_MEDIA_DIRS = ["visuals", "audio", "../visuals", "../audio"]
 
 PRIVATE_FILE = "data.private.js"
 PUBLIC_FILE  = "data.public.js"
 
+# ── Audio clip settings (EBU R128 two-pass loudness normalisation) ──────
+LOUDNORM_I    = -14    # integrated loudness target (LUFS) - streaming standard
+LOUDNORM_TP   = -1.5   # max true peak (dBTP) - headroom against clipping
+LOUDNORM_LRA  = 11     # loudness range
+AUDIO_BITRATE = "128k"
+
 DRY_RUN = "--dry-run" in sys.argv
+PRUNE   = "--prune-orphans" in sys.argv
+
+# Prune only ever touches keys under these prefixes - a safety rail so a bug
+# could never delete anything outside the media folders this script manages.
+MANAGED_PREFIXES = ("visuals/", "audio/")
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────
@@ -93,7 +120,7 @@ def fail(msg):
 
 
 def check_config():
-    """Make sure the .env values are present before we do anything."""
+    """Make sure the .env values and ffmpeg are present before we do anything."""
     missing = [k for k, v in {
         "B2_KEY_ID": B2_KEY_ID,
         "B2_APP_KEY": B2_APP_KEY,
@@ -103,12 +130,15 @@ def check_config():
     if missing:
         fail("Missing in .env: " + ", ".join(missing))
 
+    for tool in ("ffmpeg", "ffprobe"):
+        if shutil.which(tool) is None:
+            fail(f"'{tool}' not found on PATH. Install it (macOS: brew install ffmpeg).")
+
 
 def find_local_file(referenced_path):
     """
     Given a path from data.js like "../visuals/sparks.jpg", find the actual
     file on disk. Returns a Path object, or None if not found.
-    We only care about the filename - we search our known media folders.
     """
     filename = os.path.basename(referenced_path)
     for d in LOCAL_MEDIA_DIRS:
@@ -119,18 +149,13 @@ def find_local_file(referenced_path):
 
 
 def b2_object_key(local_path):
-    """
-    The 'key' (path inside the bucket) we store the file under.
-    We preserve the folder structure: visuals/sparks.jpg or audio/song.mp3
-    so the bucket stays organised.
-    """
+    """Bucket key that preserves folder structure: visuals/sparks.jpg etc."""
     parent = local_path.parent.name  # "visuals" or "audio"
     return f"{parent}/{local_path.name}"
 
 
 def cdn_url_for(object_key):
     """The final public URL a browser will use to fetch this file."""
-    # URL-encode spaces and special chars in filenames so links don't break
     from urllib.parse import quote
     safe_key = "/".join(quote(part) for part in object_key.split("/"))
     return f"{CDN_BASE}/{safe_key}"
@@ -145,63 +170,208 @@ def connect_b2():
 
 
 def get_existing_keys(bucket):
-    """
-    List filenames already in the bucket so we never re-upload.
-    Returns a set of object keys like {"visuals/sparks.jpg", ...}.
-    """
+    """Set of object keys already in the bucket, so we never re-upload."""
     existing = set()
     for file_version, _ in bucket.ls(recursive=True):
         existing.add(file_version.file_name)
     return existing
 
 
-# ── Step 1: extract every media path referenced in data.private.js ───────
+# ── ffmpeg / ffprobe ─────────────────────────────────────────────────────
 
-def extract_media_paths(text):
+def probe_duration(path):
+    """Return the duration of a media file in seconds (float, 2dp)."""
+    out = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+         "-of", "default=nw=1:nk=1", str(path)],
+        capture_output=True, text=True,
+    )
+    try:
+        return round(float(out.stdout.strip()), 2)
+    except ValueError:
+        return None
+
+
+def _seek_args(start, end):
+    args = ["-ss", str(start)]
+    if end is not None:
+        args += ["-to", str(end)]
+    return args
+
+
+def _parse_loudnorm_json(stderr):
+    """Pull the loudnorm measurement JSON ffmpeg prints to stderr (pass 1)."""
+    m = re.search(r'\{[^{}]*"input_i"[^{}]*\}', stderr, re.DOTALL)
+    if not m:
+        return None
+    try:
+        d = json.loads(m.group(0))
+    except json.JSONDecodeError:
+        return None
+    # Silence / unmeasurable input -> skip the linear (measured) second pass.
+    if str(d.get("input_i")).lstrip("-").lower() == "inf":
+        return None
+    return d
+
+
+def make_audio_clip(src, start, end, out_path):
     """
-    Pull out the value of every `media:` and `audio:` field.
-    Returns a list of (field_value, full_match) - we keep the raw matched
-    string so we can do an exact replacement later.
-    Skips null values.
+    Two-pass EBU R128 loudness-normalised trim of [start, end] from `src`.
+    The SAME seek window is used in both passes so the measurement matches
+    the clip exactly (we never normalise to the whole song's loudness).
     """
-    # Matches:  media:  "../visuals/sparks.jpg"   and   audio: "../audio/x.mp3"
-    pattern = re.compile(r'(media|audio)\s*:\s*"([^"]+)"')
-    results = []
-    for m in pattern.finditer(text):
-        field = m.group(1)
-        value = m.group(2)
-        results.append((field, value))
-    return results
+    seek = _seek_args(start, end)
+    af_base = f"loudnorm=I={LOUDNORM_I}:TP={LOUDNORM_TP}:LRA={LOUDNORM_LRA}"
+
+    # Pass 1 - measure the clip's loudness.
+    p1 = subprocess.run(
+        ["ffmpeg", "-hide_banner", "-nostats", *seek, "-i", str(src),
+         "-af", af_base + ":print_format=json", "-f", "null", "-"],
+        capture_output=True, text=True,
+    )
+    stats = _parse_loudnorm_json(p1.stderr)
+
+    af = af_base
+    if stats:
+        af += (
+            f":measured_I={stats['input_i']}"
+            f":measured_TP={stats['input_tp']}"
+            f":measured_LRA={stats['input_lra']}"
+            f":measured_thresh={stats['input_thresh']}"
+            f":offset={stats['target_offset']}:linear=true"
+        )
+
+    # Pass 2 - apply, encode the small clip.
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    p2 = subprocess.run(
+        ["ffmpeg", "-hide_banner", "-y", *seek, "-i", str(src),
+         "-af", af, "-c:a", "libmp3lame", "-b:a", AUDIO_BITRATE, str(out_path)],
+        capture_output=True, text=True,
+    )
+    if p2.returncode != 0:
+        raise RuntimeError(f"ffmpeg trim failed for {src}:\n{p2.stderr[-600:]}")
 
 
-# ── Step 2: strip the meaning field for the public file ──────────────────
+def make_faststart(src, out_path):
+    """Lossless remux moving the moov atom to the front (instant streaming)."""
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    p = subprocess.run(
+        ["ffmpeg", "-hide_banner", "-y", "-i", str(src),
+         "-c", "copy", "-movflags", "+faststart", str(out_path)],
+        capture_output=True, text=True,
+    )
+    if p.returncode != 0:
+        raise RuntimeError(f"ffmpeg faststart failed for {src}:\n{p.stderr[-600:]}")
+
+
+def _fmt_t(v):
+    """Format a seconds value for use inside a filename (3.5 -> '3p5')."""
+    if v is None:
+        return "end"
+    return f"{v:g}".replace(".", "p")
+
+
+# ── Entry parsing ─────────────────────────────────────────────────────────
+
+ENTRY_ID_RE = re.compile(r'\bid:\s*(\d+)')
+
+
+def entry_blocks(text):
+    """
+    Split the file into per-entry text blocks using `id:` as the delimiter.
+    Returns [(id, start_idx, end_idx, block_text), ...]. Splitting on the id
+    marker (rather than matching braces) is robust to `}` inside meanings.
+    """
+    matches = list(ENTRY_ID_RE.finditer(text))
+    blocks = []
+    for i, m in enumerate(matches):
+        start = m.start()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        blocks.append((int(m.group(1)), start, end, text[start:end]))
+    return blocks
+
+
+def field_str(block, name):
+    """Value of a quoted string field, or None if it's null/absent."""
+    m = re.search(rf'\b{name}:\s*"((?:[^"\\]|\\.)*)"', block)
+    return m.group(1) if m else None
+
+
+def field_num(block, name, default=None):
+    """Value of a numeric field, or `default` if it's null/absent."""
+    m = re.search(rf'\b{name}:\s*(-?\d+(?:\.\d+)?)', block)
+    return float(m.group(1)) if m else default
+
+
+# ── Public-file rebuild (per-entry, leaves private file untouched) ────────
+
+def replace_field_string(block, name, value):
+    return re.sub(
+        rf'(\b{name}:\s*")(?:[^"\\]|\\.)*(")',
+        lambda m: m.group(1) + value + m.group(2),
+        block, count=1,
+    )
+
+
+def replace_field_number(block, name, value):
+    return re.sub(
+        rf'(\b{name}:\s*)(?:null|-?\d+(?:\.\d+)?)',
+        lambda m: m.group(1) + f"{value:g}",
+        block, count=1,
+    )
+
 
 def strip_meaning(text):
-    """
-    Remove every `meaning: "..."` line from the file content.
-    Handles meanings that contain escaped quotes and span the whole value.
-    Also removes a trailing comma/newline left behind cleanly.
-    """
-    # Matches:  meaning: "....",  (including the optional trailing comma)
-    # The [^"\\]*(?:\\.[^"\\]*)* part safely matches escaped quotes inside.
-    pattern = re.compile(
-        r'\n?\s*meaning\s*:\s*"(?:[^"\\]|\\.)*"\s*,?',
-        re.DOTALL
-    )
-    cleaned = pattern.sub("", text)
-    return cleaned
+    """Remove every `meaning: "..."` field (handles escaped quotes)."""
+    pattern = re.compile(r'\n?\s*meaning\s*:\s*"(?:[^"\\]|\\.)*"\s*,?', re.DOTALL)
+    return pattern.sub("", text)
 
 
 def fix_trailing_commas(text):
-    """
-    After removing meaning (often the last field in an entry), an entry
-    might end with:  ...placeholderColor: "#abc",\n  }
-    which is fine. But if meaning was NOT last, removal is clean anyway.
-    This is a safety pass to remove any ", }" -> " }" artifacts.
-    """
-    text = re.sub(r',(\s*})', r'\1', text)   # ", }" -> " }"
-    text = re.sub(r',(\s*\])', r'\1', text)  # ", ]" -> " ]"
+    text = re.sub(r',(\s*})', r'\1', text)
+    text = re.sub(r',(\s*\])', r'\1', text)
     return text
+
+
+HEADER = (
+    "/* ====================================================\n"
+    " * data.public.js  -  AUTO-GENERATED by publish.py\n"
+    " * DO NOT EDIT THIS FILE BY HAND.\n"
+    " * Edit data.private.js and re-run:  python publish.py\n"
+    " * (meanings stripped · media -> CDN · audio -> trimmed clips)\n"
+    " * ==================================================== */\n\n"
+)
+
+
+def build_public(private_text, transforms):
+    """
+    Rebuild the public file from the private text, applying per-entry
+    transforms: id -> {media_url, audio_url, audio_start, audio_end}.
+    """
+    blocks = entry_blocks(private_text)
+    if not blocks:
+        fail("Could not find any entries (no `id:` fields) in the private file.")
+
+    out = [private_text[:blocks[0][1]]]  # preamble (doc comment + `const ENTRIES = [`)
+    for eid, _start, _end, block in blocks:
+        t = transforms.get(eid)
+        if t:
+            if t.get("media_url"):
+                block = replace_field_string(block, "media", t["media_url"])
+            if t.get("audio_url"):
+                block = replace_field_string(block, "audio", t["audio_url"])
+                block = replace_field_number(block, "audioStart", t["audio_start"])
+                if t.get("audio_end") is not None:
+                    block = replace_field_number(block, "audioEnd", t["audio_end"])
+        out.append(block)
+
+    text = "".join(out)
+    text = strip_meaning(text)
+    text = fix_trailing_commas(text)
+    # Drop the leading /** ... */ doc block and any trailing TEMPLATE block.
+    text = re.sub(r'^\s*/\*\*.*?\*/\s*', "", text, count=1, flags=re.DOTALL)
+    text = re.sub(r'/\*\s*─+\s*TEMPLATE.*?\*/\s*$', "", text, flags=re.DOTALL)
+    return HEADER + text.lstrip()
 
 
 # ── Main ─────────────────────────────────────────────────────────────────
@@ -210,115 +380,179 @@ def main():
     print("\n" + "=" * 60)
     print("  THE ASSORTMENT - publish")
     if DRY_RUN:
-        print("  (DRY RUN - nothing will be uploaded or written)")
+        print("  (DRY RUN - nothing processed, uploaded or written)")
     print("=" * 60)
 
     if not Path(PRIVATE_FILE).exists():
-        fail(f"{PRIVATE_FILE} not found. Run this from the project root.")
+        fail(f"{PRIVATE_FILE} not found. Run this from the folder it lives in.")
 
     check_config()
 
-    # --- Read the master file ---
     private_text = Path(PRIVATE_FILE).read_text(encoding="utf-8")
-    media_refs = extract_media_paths(private_text)
-    print(f"\n  Found {len(media_refs)} media references in {PRIVATE_FILE}.")
+    blocks = entry_blocks(private_text)
+    print(f"\n  Found {len(blocks)} entries in {PRIVATE_FILE}.")
 
-    # --- Map each referenced path to its local file + intended bucket key ---
-    # path_map:  referenced_value -> (local_path, object_key, cdn_url)
-    path_map = {}
-    missing_files = []
-    for field, value in media_refs:
-        local = find_local_file(value)
-        if local is None:
-            missing_files.append(value)
-            continue
-        key = b2_object_key(local)
-        path_map[value] = (local, key, cdn_url_for(key))
-
-    if missing_files:
-        print("\n  WARNING - these referenced files were not found locally:")
-        for mf in missing_files:
-            print(f"      {mf}")
-        print("  They will be left as-is in the public file.")
-
-    # --- Connect to B2 and see what's already uploaded ---
-    if not DRY_RUN:
+    # --- Connect to B2 (so we can skip files already uploaded) ---
+    # We need the bucket for a real run, and also for --prune-orphans (even in
+    # dry-run, so we can *list* what would be deleted without deleting it).
+    if not DRY_RUN or PRUNE:
         print("\n  Connecting to Backblaze B2...")
         bucket = connect_b2()
         existing = get_existing_keys(bucket)
         print(f"  Bucket already contains {len(existing)} files.")
     else:
-        bucket = None
-        existing = set()
+        bucket, existing = None, set()
 
-    # --- Upload the new ones ---
-    uploaded, skipped = 0, 0
-    for value, (local, key, url) in path_map.items():
+    counts = {"uploaded": 0, "skipped": 0, "trimmed": 0, "faststart": 0, "cached": 0}
+    warnings = []
+    transforms = {}
+    wanted_keys = set()  # every bucket key the site needs after this run
+
+    def ensure_uploaded(local_path, key):
+        """Upload `local_path` under `key` unless already present. Returns CDN url."""
+        wanted_keys.add(key)
+        url = cdn_url_for(key)
         if key in existing:
-            skipped += 1
-            continue
+            counts["skipped"] += 1
+            return url
         if DRY_RUN:
-            print(f"  [dry-run] would upload: {local}  ->  {key}")
-            uploaded += 1
-            continue
-        print(f"  Uploading: {local}  ->  {key}")
-        bucket.upload_local_file(local_file=str(local), file_name=key)
-        uploaded += 1
+            print(f"  [dry-run] would upload: {local_path}  ->  {key}")
+            counts["uploaded"] += 1
+            return url
+        print(f"  Uploading: {key}")
+        bucket.upload_local_file(local_file=str(local_path), file_name=key)
+        existing.add(key)
+        counts["uploaded"] += 1
+        return url
 
-    print(f"\n  Uploaded: {uploaded}   Skipped (already present): {skipped}")
+    for eid, _s, _e, block in blocks:
+        mtype = field_str(block, "mediaType")
+        media = field_str(block, "media")
+        audio = field_str(block, "audio")
+        a_start = field_num(block, "audioStart", 0) or 0
+        a_end = field_num(block, "audioEnd", None)
 
-    # --- Build the public file ---
-    public_text = private_text
+        t = {}
 
-    # Replace each local media path with its CDN URL.
-    # We replace the exact quoted string to avoid touching anything else.
-    for value, (local, key, url) in path_map.items():
-        public_text = public_text.replace(f'"{value}"', f'"{url}"')
+        # ----- VISUAL -----
+        if media:
+            local = find_local_file(media)
+            if local is None:
+                warnings.append(f"entry {eid}: media not found locally ({media})")
+            elif mtype == "video":
+                out = local.parent / "web" / local.name
+                key = f"visuals/web/{local.name}"
+                if not out.exists() and not DRY_RUN:
+                    print(f"  Faststart: entry {eid} ({local.name})")
+                    make_faststart(local, out)
+                    counts["faststart"] += 1
+                elif out.exists():
+                    counts["cached"] += 1
+                elif DRY_RUN:
+                    print(f"  [dry-run] would faststart: {local.name}")
+                    counts["faststart"] += 1
+                upload_path = out if out.exists() else local
+                t["media_url"] = ensure_uploaded(upload_path, key)
+            else:  # image (or anything else) - upload as-is
+                key = b2_object_key(local)
+                t["media_url"] = ensure_uploaded(local, key)
 
-    # Strip the private meaning fields.
-    public_text = strip_meaning(public_text)
-    public_text = fix_trailing_commas(public_text)
+        # ----- AUDIO (trim to a small loudnorm'd clip) -----
+        if audio:
+            local = find_local_file(audio)
+            if local is None:
+                warnings.append(f"entry {eid}: audio not found locally ({audio})")
+            else:
+                clip_name = f"{local.stem}__{_fmt_t(a_start)}_{_fmt_t(a_end)}.mp3"
+                out = local.parent / "clips" / clip_name
+                key = f"audio/clips/{clip_name}"
 
-    # Remove the original leading /** ... */ documentation block (it
-    # describes the meaning field and the private workflow - not needed
-    # publicly). We only strip the FIRST block, which is the file header.
-    public_text = re.sub(r'^\s*/\*\*.*?\*/\s*', "", public_text, count=1, flags=re.DOTALL)
+                if not out.exists() and not DRY_RUN:
+                    print(f"  Trimming: entry {eid}  [{a_start}-{a_end}]  {local.name}")
+                    make_audio_clip(local, a_start, a_end, out)
+                    counts["trimmed"] += 1
+                elif out.exists():
+                    counts["cached"] += 1
+                elif DRY_RUN:
+                    print(f"  [dry-run] would trim: entry {eid} [{a_start}-{a_end}] {local.name}")
+                    counts["trimmed"] += 1
 
-    # Remove the TEMPLATE comment block at the bottom too, if present
-    # (it also documents the meaning field).
-    public_text = re.sub(r'/\*\s*─+\s*TEMPLATE.*?\*/\s*$', "", public_text, flags=re.DOTALL)
+                clip_len = probe_duration(out) if out.exists() else (
+                    round(a_end - a_start, 2) if a_end is not None else None
+                )
+                t["audio_url"] = ensure_uploaded(out if out.exists() else local, key)
+                t["audio_start"] = 0
+                t["audio_end"] = clip_len
 
-    # Add a header note so it's obvious this file is generated.
-    header = (
-        "/* ====================================================\n"
-        " * data.public.js  -  AUTO-GENERATED by publish.py\n"
-        " * DO NOT EDIT THIS FILE BY HAND.\n"
-        " * Edit data.private.js and re-run:  python publish.py\n"
-        " * (meanings stripped · media paths point to the CDN)\n"
-        " * ==================================================== */\n\n"
+        if t:
+            transforms[eid] = t
+
+    print(
+        f"\n  Trimmed: {counts['trimmed']}   Faststart: {counts['faststart']}   "
+        f"Reused local: {counts['cached']}"
     )
-    public_text = header + public_text.lstrip()
+    print(f"  Uploaded: {counts['uploaded']}   Skipped (already in bucket): {counts['skipped']}")
+
+    if warnings:
+        print("\n  WARNINGS (these entries were left pointing at their original paths):")
+        for w in warnings:
+            print(f"      {w}")
+
+    # --- Build & write the public file (skipped on a plain dry run) ---
+    if not DRY_RUN:
+        public_text = build_public(private_text, transforms)
+        Path(PUBLIC_FILE).write_text(public_text, encoding="utf-8")
+        print(f"\n  Wrote {PUBLIC_FILE}  (meanings stripped, clips + CDN URLs injected).")
+
+        # Sanity check: no private meaning leaked.
+        leak = re.search(r'meaning\s*:\s*"', Path(PUBLIC_FILE).read_text(encoding="utf-8"))
+        if leak:
+            print(f"\n  !!  WARNING: a 'meaning:' field still appears in {PUBLIC_FILE}. "
+                  "Inspect it before pushing.")
+        else:
+            print("  Verified: no 'meaning:' field present in public file.")
+
+    # --- Prune orphans (only with --prune-orphans), done last ---
+    if PRUNE:
+        prune_orphans(bucket, wanted_keys)
 
     if DRY_RUN:
-        print(f"\n  [dry-run] would write {PUBLIC_FILE} "
-              f"({len(public_text)} chars, meanings stripped).")
-        print("\n  Dry run complete.\n")
+        print("\n  Dry run complete - nothing written, uploaded or deleted.\n")
+    else:
+        print("\n  Next:  git add . && git commit -m 'new entries' && git push\n")
+
+
+def prune_orphans(bucket, wanted_keys):
+    """
+    Delete every bucket object under a managed prefix that the site no longer
+    references (old full songs, superseded clips, non-faststart videos).
+    Respects --dry-run (lists only). Refuses to run on an empty wanted set,
+    so a parsing failure can never wipe the bucket.
+    """
+    print("\n  Prune: scanning for orphaned files...")
+    if not wanted_keys:
+        print("  Prune SKIPPED: nothing was marked as needed this run "
+              "(safety guard - refusing to delete everything).")
         return
 
-    Path(PUBLIC_FILE).write_text(public_text, encoding="utf-8")
-    print(f"\n  Wrote {PUBLIC_FILE}  (meanings stripped, CDN URLs injected).")
+    orphans = [
+        fv for fv, _ in bucket.ls(recursive=True)
+        if fv.file_name not in wanted_keys
+        and fv.file_name.startswith(MANAGED_PREFIXES)
+    ]
 
-    # --- Final sanity check: make sure no real 'meaning:' field leaked ---
-    # We look for an actual data field (meaning : "...") not the word in a
-    # comment, so the header documentation doesn't trigger a false alarm.
-    leak = re.search(r'meaning\s*:\s*"', Path(PUBLIC_FILE).read_text(encoding="utf-8"))
-    if leak:
-        print("\n  !!  WARNING: a 'meaning:' field still appears in "
-              f"{PUBLIC_FILE}. Inspect it before pushing.")
-    else:
-        print("  Verified: no 'meaning:' field present in public file.")
+    if not orphans:
+        print("  Prune: bucket already clean - no orphans found.")
+        return
 
-    print("\n  Next:  git add . && git commit -m 'new entries' && git push\n")
+    print(f"  Prune: {len(orphans)} orphaned file(s)"
+          f"{' would be' if DRY_RUN else ''} removed:")
+    for fv in orphans:
+        print(f"      {'[dry-run] ' if DRY_RUN else ''}{fv.file_name}")
+        if not DRY_RUN:
+            bucket.delete_file_version(fv.id_, fv.file_name)
+    if not DRY_RUN:
+        print(f"  Prune: removed {len(orphans)} orphaned file(s).")
 
 
 if __name__ == "__main__":

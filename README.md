@@ -55,7 +55,7 @@ Visitors can leave their own interpretation of a moment. It's append-only and pr
 ## Features
 
 - Old-School click-wheel interface (prev / next / play-pause / credits / close)
-- Three sort modes - chronological, recent, shuffle
+- Three sort modes - shuffle (the default, session-stable), chronological, recent
 - Pagination, lazy-loaded thumbnails, keyboard shortcuts
 - Per-entry credits panel linking to original sources
 - Audio excerpting via time-range fragments + next-entry prefetch for fast sequential playback

@@ -11,7 +11,7 @@ let currentDisplayed = 0;    // Tracks pagination load count
 let audioPlayer      = null; // The active HTML5 Audio object
 let isPlaying        = false;// Tracks if audio is currently playing
 let progressTimer    = null; // Interval timer for the audio progress bar
-let sortMode         = 'chrono'; // 'chrono', 'recent', 'shuffle'
+let sortMode         = 'shuffle'; // 'chrono', 'recent', 'shuffle' (default)
 let showCredits      = false;// Tracks which view the iPod screen is showing
 let sb               = null; // Supabase client (set in initSupabase)
 let activeTakeEntry  = null; // The entry the open "your take" modal refers to
@@ -53,9 +53,11 @@ function buildPlaylist() {
     });
     displayOrder = sortedEntries.map(e => e.id);
   } else {
-    // Shuffle
+    // Session-stable shuffle: order is derived from a seed kept in
+    // sessionStorage, so it holds across reloads and chrono<->shuffle
+    // toggles within a visit (see getShuffleSeed / seededShuffle).
     displayOrder = ENTRIES.map(e => e.id);
-    shuffleArray(displayOrder);
+    seededShuffle(displayOrder, getShuffleSeed());
   }
 
   // Clear existing items and reset counts
@@ -465,6 +467,9 @@ function bindControls() {
   document.getElementById('btn-shuffle').addEventListener('click', () => setSortMode('shuffle'));
 
   function setSortMode(mode) {
+    // Clicking Shuffle while already shuffled deals a fresh arrangement;
+    // otherwise the session's shuffle order is preserved.
+    if (mode === 'shuffle' && sortMode === 'shuffle') getShuffleSeed(true);
     sortMode = mode;
     document.getElementById('btn-chrono').classList.toggle('active', mode === 'chrono');
     document.getElementById('btn-recent').classList.toggle('active', mode === 'recent');
@@ -884,11 +889,42 @@ function formatCredit(val) {
   return escapeHTML(val);
 }
 
-function shuffleArray(arr) {
+// ── SESSION-STABLE SHUFFLE ─────────────────────────────────
+// The shuffle order is reproducible from a single seed. We keep that seed
+// in sessionStorage so the arrangement survives reloads and sort-toggle
+// round-trips within one visit, but a brand-new visit (new tab/session),
+// or an explicit re-shuffle, gets a fresh deal.
+const SHUFFLE_SEED_KEY = 'assortment_shuffle_seed';
+
+function getShuffleSeed(forceNew = false) {
+  let seed = null;
+  try { seed = sessionStorage.getItem(SHUFFLE_SEED_KEY); } catch (e) { /* storage blocked */ }
+  if (forceNew || seed === null) {
+    seed = String(Math.floor(Math.random() * 2 ** 32));
+    try { sessionStorage.setItem(SHUFFLE_SEED_KEY, seed); } catch (e) { /* storage blocked */ }
+  }
+  return Number(seed);
+}
+
+// mulberry32: tiny deterministic PRNG. A given seed always yields the
+// same sequence, which is what makes the shuffle reproducible.
+function mulberry32(seed) {
+  return function () {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Seeded Fisher-Yates shuffle, in place.
+function seededShuffle(arr, seed) {
+  const rand = mulberry32(seed);
   for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rand() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
+  return arr;
 }
 
 function escapeHTML(str) {

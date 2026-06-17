@@ -380,7 +380,67 @@ mixed these and was less clear about both.
 
 ---
 
-## 13. Things deliberately not built
+## 13. Default sort: session-stable shuffle
+
+**Decision:** the playlist defaults to **Shuffle**, and that shuffle is
+*session-stable* - the order is fixed for the duration of a visit and only
+re-randomizes on a brand-new session or an explicit re-shuffle. Chronological
+and Recent remain as toggles.
+
+**Why default to shuffle (changed from chronological):**
+- The project is called *The Assortment* and describes itself as "a collection
+  of moments... not named and not explained, just felt." That's an explicit
+  anti-timeline stance. A chronological default implies a narrative sequence and
+  quietly ranks entries (newest = most relevant), which contradicts the premise
+  that every moment is equal and independent.
+- Shuffle reinforces the concept: serendipity, a fresh path each visit, no
+  privileged entry, and a reason to return.
+
+**Why session-stable, not re-random on every load:**
+- A naive shuffle that re-randomizes on every reload or interaction is
+  disorienting - you lose your place mid-browse and can't point a friend to a
+  specific entry.
+- The order is derived from a single seed kept in `sessionStorage`. A
+  deterministic PRNG (mulberry32) feeding a seeded Fisher-Yates reproduces the
+  same order from that seed, so the arrangement survives reloads and
+  chronological<->shuffle round-trips within one visit. A new tab/session gets a
+  new seed; clicking Shuffle while already shuffled forces a new seed ("deal
+  again").
+
+**Why a seed, not the stored order array:** a seed is compact and robust to the
+entry set changing between renders; persisting the literal id order would go
+stale if an id disappeared. Seed + deterministic shuffle always regenerates a
+valid order for whatever entries currently exist.
+
+**Trade-off accepted:** within one tab session the order is preserved, so newly
+added entries aren't surfaced by default for a returning visitor. That's what
+the Recent toggle is for - verifying a new entry landed is a deliberate toggle,
+not the default experience.
+
+---
+
+## 14. Favicon and link previews
+
+**Decision:** an iPod-shaped SVG favicon, a generated 1200x630 PNG social card
+for Open Graph / Twitter, plus standard description / author / theme-color /
+canonical meta tags.
+
+**Why the favicon is the iPod, not a logo or monogram:** the iPod player is the
+site's visual hero (section 10). The favicon echoes it - cream body, black
+screen with an accent-blue play glyph, click-wheel - so the browser tab reads as
+a tiny version of the thing the site is about. An SVG mark stays crisp at every
+size and is version-controllable as text, with no binary asset to manage.
+
+**Why a separate PNG card and not the SVG for previews:** link-unfurlers
+(WhatsApp, iMessage, most chat apps) don't render SVG `og:image`s - they need a
+raster. So the favicon stays SVG, but the share image is a PNG: a dark,
+landing-style card (title + the iPod illustration) at the 1.91:1 / 1200x630
+proportion, referenced with `summary_large_image`. It's rasterized from an SVG
+source locally rather than hand-painted, so it stays editable as text.
+
+---
+
+## 15. Things deliberately not built
 
 Worth listing the choices made by *omission*:
 

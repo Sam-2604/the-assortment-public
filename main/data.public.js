@@ -985,7 +985,7 @@ const ENTRIES = [
     id: 76,
     date:             "2023-10-13",
     thumbnail:        null,
-    media:            "../visuals/almost-idyllic.jpg",
+    media:            "https://media.samarthgoradia.com/visuals/almost-idyllic.jpg",
     mediaType:        "image",
     audio:            "https://media.samarthgoradia.com/audio/clips/Almost%20Idyllic%20-%20Sleeping%20At%20Last__0_128.mp3",
     audioStart:       0,
